@@ -3,10 +3,8 @@ char *version="/* 16-bit code V1.30 */\n";
 #include "c.h"
 #include <string.h>
 #include <stdio.h>
-#include <stdbool.h>
 extern void exit(int);
 
-static bool graph_output;    /* output forest of dags from frontend */
 static int localsize;        /* max size of locals */
 static int argoffset;        /* current stack position */
 static int offset;        /* current local size */
@@ -21,14 +19,6 @@ static Symbol temp[32];        /* 32 symbols pointing to temporary variables... 
         /* (8 last ones for floating point) */
 static char *regname[8];    /* 8 register variables names */
 
-static char *opcode_names[] = { 
-    NULL,"CNST","ARG","ASGN","INDIR","CVC","CVD","CVF","CVI","CVP",
-    "CVS","CVU","NEG","CALL","LOAD","RET","ADDRG","ADDRF","ADDRL","ADD",
-    "SUB","LSH","MOD","RSH","BAND","BCOM","BOR","BXOR","DIV","MUL",
-    "EQ","GE","GT","LE","LT","NE","JUMP","LABEL","MAXOP" };
-static char type_name[] = " FDCSIUPVB??????";
-static char *additional_operators[] = {
-    "AND","NOT","OR","COND","RIGHT","FIELD" };
 
 void print_node(Node p) {
     printf("Node addr: %p\n", p);
@@ -46,65 +36,11 @@ void print_node(Node p) {
     printf("  name: %s\n",    p->x.name);
 }
 
-void print_graph_node(Node p) {
-    Symbol s;
-    if (p == NULL) return;
-    if (p->op < MAXOP)
-        printf("\t%s%p [label=\"%s%c\"];\n", fname, p,
-            opcode_names[generic(p->op)>>4], type_name[optype(p->op)]);
-    else printf("\t%s%p [label=\"%s\"];\n", fname, p, 
-            additional_operators[p->op - MAXOP]);
-
-    switch (generic(p->op)) {
-    case ADDRF: case ADDRG: case ADDRL: case CNST: case LABEL:
-        /* 1 symbol */
-        s = p->syms[0];
-        printf("\t%s%p [shape=box,label=\"%s\"];\n",fname,s,s->x.name);
-        printf("\t%s%p -> %s%p [style=dotted];\n",fname,p,fname,s);
-        break;
-
-    case EQ: case GE: case GT: case LE: case LT: case NE:
-        /* 1 symbol, 2 kids */
-        printf("\tN%p [label=\"%s\"];\n",p->syms[0],p->syms[0]->name);
-        printf("\t%s%p -> N%p [style=dotted,label=\"label\"];\n",
-                fname,p,p->syms[0]);
-
-    case ASGN:
-    case ADD: case SUB: case BAND: case BOR: case BXOR: 
-    case DIV: case LSH: case MOD: case MUL: case RSH:
-        /* 2 kids */
-        printf("\t%s%p -> %s%p [label=\"right\"];\n",fname,p,fname,p->kids[1]);
-
-    case BCOM:
-    case CVC: case CVD: case CVF: case CVI: case CVP: case CVS: case CVU:
-    case INDIR: case NEG:
-    case JUMP:
-    case ARG: 
-        /* 1 kid */
-        printf("\t%s%p -> %s%p;\n",fname,p,fname,p->kids[0]);
-        break;
-
-    case RET:
-        /* 0 or 1 kid */
-        if (optype(p->op) != V)
-            printf("\t%s%p -> %s%p;\n",fname,p,fname,p->kids[0]);
-        break;
-
-    case CALL:
-        /* 1 or 2 kids */
-        printf("\t%s%p -> %s%p;\n", fname,p,fname,p->kids[0]);
-        if (optype(p->op) == B)
-            printf("\t%s%p -> %s%p [label=\"res\"];\n",fname,p,fname,p->kids[1]);
-        break;
-    }
-}
-
 static Node *linearize(Node p, Node *last, Node next) {
     if (p && !p->x.visited) {
         if ( optimizelevel>0 ) {
             switch (generic(p->op)) {
-            case CNST: 
-            case ADDRG: case ADDRL: case ADDRF:
+            case CNST: case ADDRG: case ADDRL: case ADDRF:
                 p->x.optimized=1;
                 p->x.result=p->syms[0];
                 p->x.adrmode=p->syms[0]->x.adrmode;
@@ -112,9 +48,8 @@ static Node *linearize(Node p, Node *last, Node next) {
                 return last;
             }
         }
-        last = linearize(p->kids[0], last, NULL);
-        last = linearize(p->kids[1], last, NULL);
-fprintf(stderr, "Linearized: %s%c\n", opcode_names[generic(p->op)>>4], type_name[optype(p->op)]);
+        last = linearize(p->kids[0], last, 0);
+        last = linearize(p->kids[1], last, 0);
         p->x.visited = 1;
         *last = p;
         last = &p->x.next;
@@ -125,11 +60,10 @@ fprintf(stderr, "Linearized: %s%c\n", opcode_names[generic(p->op)>>4], type_name
 
 void progbeg(int argc,char *argv[]) {
     int i;
+    print(version);
     for(i=1;i<argc;i++) {
         if (strncmp(argv[i],"-N",2)==0) {
             NamePrefix=argv[i]+2;
-        } else if (strcmp(argv[i],"-G")==0) {
-            graph_output=true;
         } else if (strcmp(argv[i],"-O")==0) {
             optimizelevel=3;
         } else if (strcmp(argv[i],"-O0")==0) {
@@ -142,30 +76,22 @@ void progbeg(int argc,char *argv[]) {
         } else if (strcmp(argv[i],"-O3")==0) {
             optimizelevel=3;    /* optimizes INDIR, ASGN ... */
         } else {
-            fprintf(stderr,"Unknown option %s\n",argv[i]);
+            printf("Unknown option %s\n",argv[i]);
             exit(1);
         }
     }
-    if (graph_output) optimizelevel=0;
-    if (graph_output) printf("digraph Frontend_output {\n");
-    else print(version);
-
     for (i=0;i<8;i++) {
         temp[i]= newtemp(STATIC,I);    /* temp[i]= newconst((Value)i,P); */
-        temp[i]->type->size=2;
         temp[i]->x.name=stringf("tmp%d",i);
-        temp[i]->x.adrmode='R';
+        temp[i]->x.adrmode='C';
         regname[i]=stringf("reg%d",i);
     }
     for (i=8;i<32;i++) {
         temp[i]= newtemp(STATIC,I);    /* temp[i]= newconst((Value)i,P); */
-        temp[i]->type->size=2;
     }
 }
 
-void progend(void) {
-    if (graph_output) printf("}\n");
-}
+void progend(void) {}
 
 void defsymbol(Symbol p) {
     if (p->x.name) return;
@@ -186,7 +112,7 @@ void defsymbol(Symbol p) {
 void export(Symbol p) {}
 void import(Symbol p) {}
 void segment(int s) {}
-void global(Symbol p) { if (!graph_output) print("%s\n", p->x.name); }
+void global(Symbol p) { print("%s\n", p->x.name); }
 
 void printfloat(double val)
 {
@@ -220,7 +146,6 @@ void printfloat(double val)
 
 
 void defconst(int ty, Value v) {
-    if (graph_output) return;
     switch (ty) {
     case C: print("\tDB(%d)\n",   v.uc); break;
     case S: print("\tDB(%d)\n",   v.us); break;
@@ -234,7 +159,6 @@ void defconst(int ty, Value v) {
 }
 
 void defstring(int len, char *s) {
-    if (graph_output) return;
     while (len > 0) {
         if (s[0]==';' || s[0]<32 || s[0]==127) {
             print("\tBYTE $%x",*s++);
@@ -258,15 +182,8 @@ void defstring(int len, char *s) {
     }
 }
 
-void defaddress(Symbol p) {
-    if (graph_output) return;
-    print("\tDW(%s)\n",p->x.name); 
-}
-
-void space(int n) {
-    if (graph_output) return;
-    print("\tZERO(%d)\n",n); 
-}
+void defaddress(Symbol p) { print("\tDW(%s)\n",p->x.name); }
+void space(int n) { print("\tZERO(%d)\n",n); }
 
 int allocreg(Symbol p) {
     if (nbregs==8 || p->type->size==5) return 0;
@@ -279,12 +196,9 @@ void function(Symbol f, Symbol caller[], Symbol callee[], int ncalls) {
     int i;
 
     localsize=offset=tmpsize=nbregs=0; fname=f->x.name;
-    if (graph_output)
-        printf("subgraph cluster%s { label=\"%s\";\n",fname,fname);
-
     for (i=8;i<32;i++) temp[i]->x.name="******";
     for (i = 0; caller[i] && callee[i]; i++) {
-        caller[i]->x.name=stringf(graph_output?"Param+%d":"(ap),%d",offset);
+        caller[i]->x.name=stringf("(ap),%d",offset);
         caller[i]->x.adrmode='A';
         offset+=caller[i]->type->size;
         if (optimizelevel>1 && callee[i]->sclass==REGISTER && allocreg(callee[i]))
@@ -297,26 +211,21 @@ void function(Symbol f, Symbol caller[], Symbol callee[], int ncalls) {
     }
     busy=localsize=0; offset=6;
     gencode(caller,callee);
-
     omit_frame=(i==0 && localsize==6);
-    if (!graph_output) {
-        print("%s\n",fname);
-        if (optimizelevel>1 && omit_frame && nbregs==0)
-            ;
-        else print("\tENTER(%d,%d)\n",nbregs,localsize);
-        if (isstruct(freturn(f->type)))
-            print("\tMOVW_DI(op1,(fp),6)\n");
-    }
+    print("%s\n",fname);
+    if (optimizelevel>1 && omit_frame && nbregs==0)
+        ;
+    else print("\tENTER(%d,%d)\n",nbregs,localsize);
+    if (isstruct(freturn(f->type)))
+        print("\tMOVW_DI(op1,(fp),6)\n");
     emitcode();
-
-    if (graph_output) printf("}\n");
 }
 
 void local(Symbol p) {
     if (optimizelevel>1 && p->sclass==REGISTER && allocreg(p))
         return; /* allocreg ok */
     if (p->x.name && p->x.name[0]!='*') return; /* keep previous local (it isn't busy) */
-    p->x.name = stringf(graph_output?"Local+%d":"(fp),%d",offset);
+    p->x.name = stringf("(fp),%d",offset);
     p->x.adrmode = 'A';
     p->sclass = AUTO;
     offset+=p->type->size;
@@ -351,7 +260,7 @@ static void gettmp(Node p) {
                 p->x.result=temp[t];
                 p->x.adrmode='D';
                 if (t>=8) {
-//                    temp[t]->type->size=2;
+                    temp[t]->type->size=2;
                     local(temp[t]);
                     p->x.adrmode='I';
                 }
@@ -364,7 +273,7 @@ static void gettmp(Node p) {
                 busy|=1<<t;
                 p->x.result=temp[t];
                 p->x.adrmode='I';
-//                temp[t]->type->size=5;
+                temp[t]->type->size=5;
                 local(temp[t]);
                 p->x.name=temp[t]->x.name;
                 return;
@@ -393,7 +302,6 @@ static void releasetmp(Node p) {
             
 static int needtmp(Node p) {
     Node q;
-    if (graph_output) return 0;
     switch (generic(p->op)) {
         case ADDRF: case ADDRG: case ADDRL:
         case CNST:
@@ -401,7 +309,7 @@ static int needtmp(Node p) {
             return 1;
         case INDIR:
             if (optimizelevel!=0)
-                if (optype(p->op)==B) { /* remove all INDIRB nodes */
+                if (optype(p->op)==B) { /* fix frontend bug: remove all INDIRB nodes */
                     p->x.optimized=1;
                     p->x.result=p->kids[0]->x.result;
                     p->x.name=p->x.result->x.name;
@@ -531,9 +439,7 @@ Node gen(Node p) {
     Node head, *last;
     for (last = &head; p; p = p->link)
         last = linearize(p, last, 0);
-    for (p = head; p; p = p->x.next)
-        if (graph_output) print_graph_node(p);
-        else tmpalloc(p);
+    for (p = head; p; p = p->x.next) tmpalloc(p);
     return head;
 }
 
@@ -830,6 +736,5 @@ void emitdag(Node p) {
 }
 
 void emit(Node p) {
-    if (graph_output) return;
     for (; p; p=p->x.next) emitdag(p);
 }
