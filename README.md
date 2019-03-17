@@ -1,2 +1,2 @@
-# lcc6502
+# lcc65
 C Cross-Compiler
