@@ -9,17 +9,18 @@ extern void exit(int);
 static bool graph_output;    /* output forest of dags from frontend */
 static int localsize;        /* max size of locals */
 static int argoffset;        /* current stack position */
-static int offset;        /* current local size */
-static int tmpsize;        /* max size of temporary variables */
-static int nbregs;        /* number of used registers */
+static int offset;           /* current local size */
+static int tmpsize;          /* max size of temporary variables */
+static int nbregs;           /* number of used registers */
 static unsigned busy;        /* busy&(1<<t) == 1 if tmp t is used */
-static char *callname;        /* current function called name */
-static char *NamePrefix;    /* Prefix for all local names */
-static int omit_frame;        /* if no params and no locals */
-static int optimizelevel=3;    /* set by command line option -On */
-static Symbol temp[32];        /* 32 symbols pointing to temporary variables... */
-        /* (8 last ones for floating point) */
-static char *regname[8];    /* 8 register variables names */
+static unsigned busy_flt;    /* busy_flt&(1<<t) == 1 if tmp t is used */
+static char *callname;       /* current function called name */
+static char *NamePrefix;     /* Prefix for all local names */
+static int omit_frame;       /* if no params and no locals */
+static int optimizelevel=3;  /* set by command line option -On */
+static Symbol temp[32];      /* 32 symbols pointing to temporary variables... */
+static Symbol flt_temp[32];  /* 32 symbols pointing to temporary floating-point variables... */
+static char *regname[8];     /* 8 register variables names */
 
 static char *opcode_names[] = { 
     NULL,"CNST","ARG","ASGN","INDIR","CVC","CVD","CVF","CVI","CVP",
@@ -31,19 +32,21 @@ static char *additional_operators[] = {
     "AND","NOT","OR","COND","RIGHT","FIELD" };
 
 void print_node(Node p) {
-    printf("Node addr: %p\n", p);
-    printf("  optimized: %d\n", p->x.optimized);
-    printf("  referenced: %d\n", p->count);
-    printf("  Operator = %d\n", p->op);
-    printf("  link to next dag:  %p\n", p->link);
-    printf("  next on linearized list: %p\n", p->x.next);
-    printf("  syms[0]: %p\n", p->syms[0]);
-    printf("  syms[1]: %p\n", p->syms[1]);
-    printf("  kids[0]: %p\n", p->kids[0]);
-    printf("  kids[1]: %p\n", p->kids[1]);
-    printf("  result: %p\n",  p->x.result);
-    printf("  adrmode: %c\n", p->x.adrmode);
-    printf("  name: %s\n",    p->x.name);
+    fprintf(stderr,"Node %s%c\n",
+            opcode_names[generic(p->op)>>4], type_name[optype(p->op)]);
+    fprintf(stderr,"Node addr: %p\n", p);
+    fprintf(stderr,"  optimized: %d\n", p->x.optimized);
+    fprintf(stderr,"  referenced: %d\n", p->count);
+    fprintf(stderr,"  Operator = %d\n", p->op);
+    fprintf(stderr,"  link to next dag:  %p\n", p->link);
+    fprintf(stderr,"  next on linearized list: %p\n", p->x.next);
+    fprintf(stderr,"  syms[0]: %p\n", p->syms[0]);
+    fprintf(stderr,"  syms[1]: %p\n", p->syms[1]);
+    fprintf(stderr,"  kids[0]: %p\n", p->kids[0]);
+    fprintf(stderr,"  kids[1]: %p\n", p->kids[1]);
+    fprintf(stderr,"  result: %p\n",  p->x.result);
+    fprintf(stderr,"  adrmode: %c\n", p->x.adrmode);
+    fprintf(stderr,"  name: %s\n",    p->x.name);
 }
 
 void print_graph_node(Node p) {
@@ -114,7 +117,6 @@ static Node *linearize(Node p, Node *last, Node next) {
         }
         last = linearize(p->kids[0], last, NULL);
         last = linearize(p->kids[1], last, NULL);
-fprintf(stderr, "Linearized: %s%c\n", opcode_names[generic(p->op)>>4], type_name[optype(p->op)]);
         p->x.visited = 1;
         *last = p;
         last = &p->x.next;
@@ -150,16 +152,24 @@ void progbeg(int argc,char *argv[]) {
     if (graph_output) printf("digraph Frontend_output {\n");
     else print(version);
 
+    /* 8 virtual registers */
+    for (i=0;i<8;i++) regname[i]=stringf("reg%d",i);
+
+    /* No spilling for simplicity purpose: 
+     * 32 temporaries for integer/pointer expressions, 32 for float expresssions.
+     * => very complex expressions will run out of temporaries and 
+     * raise a compilation error.
+     * First 8 integer/pointer temporaries in page zero, 
+     * next 24 temporaries on stack frame,
+     * and all 32 floating-point temporaries on stack frame.
+     */
+    for (i=0;i<32;i++) {
+        temp[i]     = newtemp(STATIC,I);
+        flt_temp[i] = newtemp(STATIC,F);
+    }
     for (i=0;i<8;i++) {
-        temp[i]= newtemp(STATIC,I);    /* temp[i]= newconst((Value)i,P); */
-        temp[i]->type->size=2;
         temp[i]->x.name=stringf("tmp%d",i);
         temp[i]->x.adrmode='R';
-        regname[i]=stringf("reg%d",i);
-    }
-    for (i=8;i<32;i++) {
-        temp[i]= newtemp(STATIC,I);    /* temp[i]= newconst((Value)i,P); */
-        temp[i]->type->size=2;
     }
 }
 
@@ -181,6 +191,7 @@ void defsymbol(Symbol p) {
     else
         p->x.name = stringf("_%s", p->name);
     p->x.adrmode = 'C';
+
 }
 
 void export(Symbol p) {}
@@ -195,7 +206,11 @@ void printfloat(double val)
     unsigned long mantissa;
     
     if (val==0.0) {
-        print("\tBYTE 0,0,0,0,0\n");
+        print("\tDB(0)\n");
+        print("\tDB(0)\n");
+        print("\tDB(0)\n");
+        print("\tDB(0)\n");
+        print("\tDB(0)\n");
         return;
     }
     if (val<0.0) { negative=1; val= -val; }
@@ -211,11 +226,11 @@ void printfloat(double val)
     }
     if (!negative) val-=two_pow31;
     mantissa=val;
-    print("\tBYTE $%x",exp+128);
-    print(",$%x",(mantissa>>24)&0xFF);
-    print(",$%x",(mantissa>>16)&0xFF);
-    print(",$%x",(mantissa>>8)&0xFF);
-    print(",$%x\n",mantissa&0xFF);
+    print("\tDB($%x)\n",exp+128);
+    print("\tDB($%x)\n",(mantissa>>24)&0xFF);
+    print("\tDB($%x)\n",(mantissa>>16)&0xFF);
+    print("\tDB($%x)\n",(mantissa>>8)&0xFF);
+    print("\tDB($%x)\n",mantissa&0xFF);
 }
 
 
@@ -237,10 +252,10 @@ void defstring(int len, char *s) {
     if (graph_output) return;
     while (len > 0) {
         if (s[0]==';' || s[0]<32 || s[0]==127) {
-            print("\tBYTE $%x",*s++);
+            print("\tDB($%x)\n",*s++);
             len--;
             while (len>0 && (s[0]==';' || s[0]<32 || s[0]==127)) {
-                print(",$%x",*s++);
+                print("\tDB($%x)\n",*s++);
                 len--;
             }
             print("\n");
@@ -278,11 +293,15 @@ int allocreg(Symbol p) {
 void function(Symbol f, Symbol caller[], Symbol callee[], int ncalls) {
     int i;
 
+    if (graph_output) {
+        printf("subgraph cluster%s {\n", f->x.name);
+        printf("\tlabel=\"%s\";\n",f->x.name);
+    }
     localsize=offset=tmpsize=nbregs=0; fname=f->x.name;
-    if (graph_output)
-        printf("subgraph cluster%s { label=\"%s\";\n",fname,fname);
 
+    for (i=0;i<32;i++) flt_temp[i]->x.name="******";
     for (i=8;i<32;i++) temp[i]->x.name="******";
+
     for (i = 0; caller[i] && callee[i]; i++) {
         caller[i]->x.name=stringf(graph_output?"Param+%d":"(ap),%d",offset);
         caller[i]->x.adrmode='A';
@@ -345,28 +364,27 @@ static void gettmp(Node p) {
     }
 */
     if ( optype(p->op)!=F && optype(p->op)!=D ) {
-        for (t=0;t<24;t++)
+        for (t=0;t<32;t++)
             if ((busy&(1<<t))==0) {
-                busy|=1<<t;
+                busy |= 1<<t;
                 p->x.result=temp[t];
-                p->x.adrmode='D';
+
                 if (t>=8) {
-//                    temp[t]->type->size=2;
                     local(temp[t]);
                     p->x.adrmode='I';
-                }
-                p->x.name=temp[t]->x.name;
+                } else p->x.adrmode='D';
+
+                p->x.name = temp[t]->x.name;
                 return;
             }
     } else
-        for (t=24;t<32;t++)
-            if ((busy&(1<<t))==0) {
-                busy|=1<<t;
-                p->x.result=temp[t];
+        for (t=0;t<32;t++)
+            if ((busy_flt&(1<<t))==0) {
+                busy_flt |= 1<<t;
+                p->x.result=flt_temp[t];
                 p->x.adrmode='I';
-//                temp[t]->type->size=5;
-                local(temp[t]);
-                p->x.name=temp[t]->x.name;
+                local(flt_temp[t]);
+                p->x.name = flt_temp[t]->x.name;
                 return;
             }
     perror("Too complex expression"); exit(1);
@@ -385,10 +403,16 @@ static void releasetmp(Node p) {
     }
     if (p->count==0) {
         int i;
-        for (i=0;i<32;i++)
-            if (p->x.result==temp[i]) break;
-        busy&= ~(1<<i);
+        for (i=0;i<32;i++) {
+            if (p->x.result == temp[i])   busy &= ~(1<<i);
+            if (p->x.result==flt_temp[i]) busy_flt &= ~(1<<i);
+        }
     }
+}
+
+static void print_busy() {
+    if (busy) fprintf(stderr,"Busy tmps when calling function: %x\n", busy);
+    if (busy_flt) fprintf(stderr,"Busy flt_tmps when calling function: %x\n", busy_flt);
 }
             
 static int needtmp(Node p) {
@@ -784,6 +808,7 @@ void emitdag(Node p) {
                     ,p->x.argoffset);
             break;
         case CALLD: case CALLF:
+print_busy();
             print("\tCALLF_%c%c(%s,%d,%s)\n"
                     ,a->x.adrmode
                     ,p->x.adrmode
@@ -792,6 +817,7 @@ void emitdag(Node p) {
                     ,p->x.name);
             break;
         case CALLI:
+print_busy();
             print("\tCALLW_%c%c(%s,%d,%s)\n"
                     ,a->x.adrmode
                     ,p->x.adrmode
