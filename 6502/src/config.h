@@ -26,6 +26,7 @@ typedef struct {
 	char	adrmode;	/* addressing mode of the result */
 	Symbol	result;		/* operator's result */
 	int		argoffset;	/* offset pour ARG et CALL */
+    unsigned int busy;  /* busy state for CALL */
 	Node	next;		/* next node on linearized list */
 	char	optimized;
 	char	visited;

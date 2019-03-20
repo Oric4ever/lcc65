@@ -521,6 +521,7 @@ static void tmpalloc(Node p) {
         break;
     case CALL:
         p->x.argoffset = argoffset;
+        p->x.busy      = busy;
         argoffset = 0;
         break;
     case ASGN:
@@ -555,9 +556,10 @@ Node gen(Node p) {
     Node head, *last;
     for (last = &head; p; p = p->link)
         last = linearize(p, last, 0);
-    for (p = head; p; p = p->x.next)
+    for (p = head; p; p = p->x.next) {
         if (graph_output) print_graph_node(p);
         else tmpalloc(p);
+    }
     return head;
 }
 
@@ -608,6 +610,29 @@ void compare(char *inst) {
 char adrmode(Node p) {
     if (p->x.adrmode!='D') return p->x.adrmode;
     return p->x.name[0]=='_' ? 'D': 'Z';
+}
+
+static void save_busy(Node p) {
+    int i, offset=p->x.argoffset;
+    for (int i=0; i<8; i++) {
+        if (p->x.busy & (1<<i)) {
+            // save on stack and increase the argsize
+            print("\tARGW_D(tmp%d,(sp),%d)\n", i, offset);
+            offset += 2;
+        }
+    }
+    // update the CALL's argoffset so that it is passed to the callee
+    p->x.argoffset = offset;
+}
+
+static void restore_busy(Node p) {
+    int i, offset=p->x.argoffset;
+    for (int i=7; i>=0; i--) { // reverse order
+        if (p->x.busy & (1<<i)) {
+            offset -= 2;
+            print("\tMOVW_ID((sp),%d,tmp%d)\n", offset, i);
+        }
+    }
 }
 
 void emitdag(Node p) {
@@ -798,32 +823,43 @@ void emitdag(Node p) {
                         ,p->x.argoffset);
             break;
         case CALLB:
+            save_busy(p);
             print("\tMOVW_%cD(%s,op1)\n"
                     ,b->x.adrmode
                     ,b->x.name);
-        case CALLV:
             print("\tCALLV_%c(%s,%d)\n"
                     ,a->x.adrmode
                     ,a->x.name
                     ,p->x.argoffset);
+            restore_busy(p);
+            break;
+        case CALLV:
+            save_busy(p);
+            print("\tCALLV_%c(%s,%d)\n"
+                    ,a->x.adrmode
+                    ,a->x.name
+                    ,p->x.argoffset);
+            restore_busy(p);
             break;
         case CALLD: case CALLF:
-print_busy();
+            save_busy(p);
             print("\tCALLF_%c%c(%s,%d,%s)\n"
                     ,a->x.adrmode
                     ,p->x.adrmode
                     ,a->x.name
                     ,p->x.argoffset
                     ,p->x.name);
+            restore_busy(p);
             break;
         case CALLI:
-print_busy();
+            save_busy(p);
             print("\tCALLW_%c%c(%s,%d,%s)\n"
                     ,a->x.adrmode
                     ,p->x.adrmode
                     ,a->x.name
                     ,p->x.argoffset
                     ,p->x.name);
+            restore_busy(p);
             break;
         case EQD:   case EQF:             compare("EQF" ); break;
         case EQI:
