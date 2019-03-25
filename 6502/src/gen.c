@@ -1,5 +1,6 @@
-/* C compiler: Fabrice Frances' 16 bits 6502 code generator */
-char *version="/* 16-bit code V1.30 */\n";
+/* C compiler: 16 bits 6502 code generator */
+/* (C) Fabrice Frances 1997-2019 */
+char *version="/* 16-bit code V1.32 */\n";
 #include "c.h"
 #include <string.h>
 #include <stdio.h>
@@ -31,7 +32,7 @@ static char type_name[] = " FDCSIUPVB??????";
 static char *additional_operators[] = {
     "AND","NOT","OR","COND","RIGHT","FIELD" };
 
-void print_node(Node p) {
+static void print_node(Node p) {
     fprintf(stderr,"Node %s%c\n",
             opcode_names[generic(p->op)>>4], type_name[optype(p->op)]);
     fprintf(stderr,"Node addr: %p\n", p);
@@ -49,9 +50,14 @@ void print_node(Node p) {
     fprintf(stderr,"  name: %s\n",    p->x.name);
 }
 
-void print_graph_node(Node p) {
+static void print_graph_node(Node p) {
     Symbol s;
+    Node left, right;
     if (p == NULL) return;
+    s     = p->syms[0];
+    left  = p->kids[0];
+    right = p->kids[1];
+
     if (p->op < MAXOP)
         printf("\t%s%p [label=\"%s%c\"];\n", fname, p,
             opcode_names[generic(p->op)>>4], type_name[optype(p->op)]);
@@ -61,22 +67,22 @@ void print_graph_node(Node p) {
     switch (generic(p->op)) {
     case ADDRF: case ADDRG: case ADDRL: case CNST: case LABEL:
         /* 1 symbol */
-        s = p->syms[0];
         printf("\t%s%p [shape=box,label=\"%s\"];\n",fname,s,s->x.name);
         printf("\t%s%p -> %s%p [style=dotted];\n",fname,p,fname,s);
         break;
 
     case EQ: case GE: case GT: case LE: case LT: case NE:
         /* 1 symbol, 2 kids */
-        printf("\tN%p [label=\"%s\"];\n",p->syms[0],p->syms[0]->name);
-        printf("\t%s%p -> N%p [style=dotted,label=\"label\"];\n",
-                fname,p,p->syms[0]);
+        printf("\tN%p [shape=box,label=\"%s\"];\n",s,s->x.name);
+        printf("\t%s%p -> N%p [style=dotted,label=\"label\"];\n",fname,p,s);
 
     case ASGN:
     case ADD: case SUB: case BAND: case BOR: case BXOR: 
     case DIV: case LSH: case MOD: case MUL: case RSH:
         /* 2 kids */
-        printf("\t%s%p -> %s%p [label=\"right\"];\n",fname,p,fname,p->kids[1]);
+        printf("\t%s%p -> %s%p [label=\"left\"];\n",fname,p,fname,left);
+        printf("\t%s%p -> %s%p;\n",fname,p,fname,right);
+        break;
 
     case BCOM:
     case CVC: case CVD: case CVF: case CVI: case CVP: case CVS: case CVU:
@@ -84,20 +90,20 @@ void print_graph_node(Node p) {
     case JUMP:
     case ARG: 
         /* 1 kid */
-        printf("\t%s%p -> %s%p;\n",fname,p,fname,p->kids[0]);
+        printf("\t%s%p -> %s%p;\n",fname,p,fname,left);
         break;
 
     case RET:
         /* 0 or 1 kid */
         if (optype(p->op) != V)
-            printf("\t%s%p -> %s%p;\n",fname,p,fname,p->kids[0]);
+            printf("\t%s%p -> %s%p;\n",fname,p,fname,left);
         break;
 
     case CALL:
         /* 1 or 2 kids */
-        printf("\t%s%p -> %s%p;\n", fname,p,fname,p->kids[0]);
+        printf("\t%s%p -> %s%p;\n", fname,p,fname,left);
         if (optype(p->op) == B)
-            printf("\t%s%p -> %s%p [label=\"res\"];\n",fname,p,fname,p->kids[1]);
+            printf("\t%s%p -> %s%p [label=\"res\"];\n",fname,p,fname,right);
         break;
     }
 }
@@ -159,22 +165,28 @@ void progbeg(int argc,char *argv[]) {
      * 32 temporaries for integer/pointer expressions, 32 for float expresssions.
      * => very complex expressions will run out of temporaries and 
      * raise a compilation error.
-     * First 8 integer/pointer temporaries in page zero, 
-     * next 24 temporaries on stack frame,
+     * All 32 integer/pointer temporaries in page zero, 
      * and all 32 floating-point temporaries on stack frame.
      */
     for (i=0;i<32;i++) {
         temp[i]     = newtemp(STATIC,I);
         flt_temp[i] = newtemp(STATIC,F);
     }
-    for (i=0;i<8;i++) {
+    for (i=0;i<32;i++) {
         temp[i]->x.name=stringf("tmp%d",i);
-        temp[i]->x.adrmode='R';
+        temp[i]->x.adrmode='Z';
     }
 }
 
 void progend(void) {
     if (graph_output) printf("}\n");
+}
+
+static bool is_temporary(Symbol s) {
+    int i;
+    for (i=0;i<32;i++)
+        if (s==temp[i]) return true;
+    return false;
 }
 
 void defsymbol(Symbol p) {
@@ -286,7 +298,7 @@ void space(int n) {
 int allocreg(Symbol p) {
     if (nbregs==8 || p->type->size==5) return 0;
     p->x.name=regname[nbregs];
-    p->x.adrmode='C';
+    p->x.adrmode='R';
     nbregs++;
 }
 
@@ -303,7 +315,7 @@ void function(Symbol f, Symbol caller[], Symbol callee[], int ncalls) {
     for (i=8;i<32;i++) temp[i]->x.name="******";
 
     for (i = 0; caller[i] && callee[i]; i++) {
-        caller[i]->x.name=stringf(graph_output?"Param+%d":"(ap),%d",offset);
+        caller[i]->x.name=stringf(graph_output?"param(%d)":"(ap),%d",offset);
         caller[i]->x.adrmode='A';
         offset+=caller[i]->type->size;
         if (optimizelevel>1 && callee[i]->sclass==REGISTER && allocreg(callee[i]))
@@ -324,7 +336,7 @@ void function(Symbol f, Symbol caller[], Symbol callee[], int ncalls) {
             ;
         else print("\tENTER(%d,%d)\n",nbregs,localsize);
         if (isstruct(freturn(f->type)))
-            print("\tMOVW_DI(op1,(fp),6)\n");
+            print("\tMOVW_DY(op1,(fp),6)\n");
     }
     emitcode();
 
@@ -335,7 +347,7 @@ void local(Symbol p) {
     if (optimizelevel>1 && p->sclass==REGISTER && allocreg(p))
         return; /* allocreg ok */
     if (p->x.name && p->x.name[0]!='*') return; /* keep previous local (it isn't busy) */
-    p->x.name = stringf(graph_output?"Local+%d":"(fp),%d",offset);
+    p->x.name = stringf(graph_output?"local(%d)":"(fp),%d",offset);
     p->x.adrmode = 'A';
     p->sclass = AUTO;
     offset+=p->type->size;
@@ -354,25 +366,12 @@ void blockend(Env *e) {
 
 static void gettmp(Node p) {
     int t;
-/*
-    Node q;
-    int call_found=0, use_zpage=1;
-    for (q=p->x.next; q; q=q->x.next) {
-        if (generic(q->op)==CALL) call_found=1;
-        if ((q->kids[0]==p || q->kids[1]==p) && call_found)
-            use_zpage=0; 
-    }
-*/
     if ( optype(p->op)!=F && optype(p->op)!=D ) {
         for (t=0;t<32;t++)
             if ((busy&(1<<t))==0) {
                 busy |= 1<<t;
                 p->x.result=temp[t];
-
-                if (t>=8) {
-                    local(temp[t]);
-                    p->x.adrmode='I';
-                } else p->x.adrmode='D';
+                p->x.adrmode='Z';
 
                 p->x.name = temp[t]->x.name;
                 return;
@@ -382,7 +381,7 @@ static void gettmp(Node p) {
             if ((busy_flt&(1<<t))==0) {
                 busy_flt |= 1<<t;
                 p->x.result=flt_temp[t];
-                p->x.adrmode='I';
+                p->x.adrmode='Y';
                 local(flt_temp[t]);
                 p->x.name = flt_temp[t]->x.name;
                 return;
@@ -415,8 +414,24 @@ static void print_busy() {
     if (busy_flt) fprintf(stderr,"Busy flt_tmps when calling function: %x\n", busy_flt);
 }
             
+static bool is_dereferenceable(char adrmode)
+{
+    return adrmode=='C' || adrmode=='R' || adrmode=='A' || adrmode=='Z';
+}
+
+static char dereference(char adrmode)
+{
+    assert(is_dereferenceable(adrmode));
+    switch (adrmode) {
+        case 'C': return 'D';
+        case 'R': return 'Z';
+        case 'A': return 'Y';
+        case 'Z': return 'I';
+    }
+}
+
 static int needtmp(Node p) {
-    Node q;
+    Node left = p->kids[0], right = p->kids[1];
     if (graph_output) return 0;
     switch (generic(p->op)) {
         case ADDRF: case ADDRG: case ADDRL:
@@ -426,53 +441,27 @@ static int needtmp(Node p) {
         case INDIR:
             if (optimizelevel!=0)
                 if (optype(p->op)==B) { /* remove all INDIRB nodes */
-                    p->x.optimized=1;
-                    p->x.result=p->kids[0]->x.result;
-                    p->x.name=p->x.result->x.name;
-                    p->x.adrmode=p->kids[0]->x.adrmode;
+                    p->x.optimized = 1;
+                    p->x.result    = left->x.result;
+                    p->x.name      = p->x.result->x.name;
+                    p->x.adrmode   = left->x.adrmode;
                     return 0;
                 }
                 
             if (optimizelevel>=3) {
-        /* these conditions must be true to optimize (/get rid of) an INDIR node:
-         * - this INDIR node is referenced only once (otherwise we won't able to check every reference)
-         * - and next node owns the single reference (this way we know where the reference is)
-         * - removing this node does not requires a double indirection in next node
+        /* these conditions must be true to optimize (=get rid of) an INDIR node:
+         * - this INDIR node is referenced only once 
+         *   (otherwise by delaying the indirection in parent nodes we would duplicate it,
+         *   and hence could have different behavior (TODO: example needed))
+         * - the address mode of the INDIR operand is "de-referenceable"
          */
-                if (p->count >= 2) return 1;
-                if (!p->x.next) return 1;
-
-/*
-                if (p->x.next->kids[0]==p) { // INDIR node is referenced by first operand of next node
-                    if (generic(p->x.next->op)==INDIR) { // two indirections needed, one
-                } else if (p->x.next->kids[1]==p) { // INDIR node is referenced by 2nd operand of next node
-                }
-
-                if (   p->count==1 
-                    && p->x.next 
-                    && ( p->x.next->kids[0]==p || p->x.next->kids[1]==p )
-                    && (   generic(p->kids[0]->op)==ADDRF
-                        || generic(p->kids[0]->op)==ADDRG
-                        || generic(p->kids[0]->op)==ADDRL
-                        || generic(p->kids[0]->op)==CNST
-                       )
-                    && generic(p->x.next->op)!=INDIR
-                )
-                {
-    printf("Node to optimize:\n");
-    print_node(p);
-    printf("Kid[0] node:\n");
-    print_node(p->kids[0]);
-                    p->x.optimized=1;
-                    p->x.result=p->kids[0]->x.result;
-                    p->x.name=p->x.result->x.name;
-                    if (p->x.result->x.adrmode=='C')
-                        p->x.adrmode='D';
-                    else p->x.adrmode='I';
-    print_node(p);
+                if (p->count <= 1 && is_dereferenceable(left->x.adrmode)) {
+                    p->x.optimized = 1;
+                    p->x.result    = left->x.result;
+                    p->x.name      = left->x.result->x.name;
+                    p->x.adrmode   = dereference(left->x.adrmode);
                     return 0;
-                }
-*/
+                }   
             }
             return 1;
         case ASGN:
@@ -493,31 +482,16 @@ static int needtmp(Node p) {
 
 static void tmpalloc(Node p) {
     int i;
+    Node left = p->kids[0], right = p->kids[1];
     p->x.optimized=0;
     p->x.name="*******";
     p->x.adrmode='*';
-    releasetmp(p->kids[0]); releasetmp(p->kids[1]);
+    releasetmp(left); releasetmp(right);
+
     switch (generic(p->op)) {
     case ARG:
         p->x.argoffset = argoffset;
         argoffset += p->syms[0]->u.c.v.i;
-/*
-        if (0) {
-            Node k=p->kids[0];
-            if (k->count==0
-                && generic(k->op)!=INDIR
-                && generic(k->op)!=ADDRF
-                && generic(k->op)!=ADDRG
-                && generic(k->op)!=ADDRL
-                && generic(k->op)!=CNST )
-            {
-                p->x.optimized=1;
-                k->x.optimized=1;
-                k->x.name=stringf("(sp),%d",p->x.argoffset);
-                k->x.adrmode='I';
-            }
-        }
-*/
         break;
     case CALL:
         p->x.argoffset = argoffset;
@@ -525,26 +499,23 @@ static void tmpalloc(Node p) {
         argoffset = 0;
         break;
     case ASGN:
-        if (optimizelevel>=3) {    /* kids[1] : expression droite */
+        if (optimizelevel>=3) {
+        /* these conditions must be true to optimize (=get rid of) an ASGN node:
+         * - it gets its value (right child node) from a temporary variable,
+         * - the ASGN node comes just after its right child node (TODO: could it be more general?)
+         * - and the temporary variable is not used afterwards,
+         *
+         * In this case, we try to directly assign the result inside the right child node
+         * (as the result of this child node)
+         */
             if (optype(p->op)!=B
-                && p==p->kids[1]->x.next
-                &&   ( generic(p->kids[0]->op)==ADDRF
-                    || generic(p->kids[0]->op)==ADDRG
-                    || generic(p->kids[0]->op)==ADDRL)
-                && generic(p->kids[1]->op)!=INDIR
-                && generic(p->kids[1]->op)!=ADDRF
-                && generic(p->kids[1]->op)!=ADDRG
-                && generic(p->kids[1]->op)!=ADDRL
-                && generic(p->kids[1]->op)!=CNST )
+                && p==right->x.next
+                && is_temporary(right->x.result))
             {
-                Node k=p->kids[1];
-                p->x.optimized=1;
-                k->x.optimized=1;
-                k->x.result=p->kids[0]->x.result;
-                k->x.name=k->x.result->x.name;
-                k->x.adrmode=k->x.result->x.adrmode;
-                if (k->x.adrmode=='C') k->x.adrmode='D';
-                else k->x.adrmode='I';
+                p->x.optimized     = 1;
+                right->x.result    = left->x.result;
+                right->x.name      = left->x.name;
+                right->x.adrmode   = dereference(left->x.adrmode);
             }
         }
         break;
@@ -574,42 +545,79 @@ void asmcode(char *str, Symbol argv[]) {
 
 static Node a,b,r;
 
-void binary(char *inst) {
-    print("\t%s_%c%c%c("
+/* avoid some proliferation of macros by rewriting
+ * Zero-Page address mode as Direct address mode,
+ * and Indirect address mode as Indirect Y-indexed
+ */
+static char simple_adrmode(char adrmode) {
+    if (adrmode=='Z') return 'D';
+    else if (adrmode=='I') return 'Y';
+    else return adrmode; 
+}
+static char *output_name(Symbol s) {
+    return s->x.adrmode=='I' ? stringf("(%s),0",s->x.name) : s->x.name;
+}
+static char *output_arg(Node n) { 
+    if (optimizelevel==0) return n->x.name;
+    return n->x.adrmode=='I' ? stringf("(%s),0",n->x.name) : n->x.name;
+}
+
+static void binary(char *inst) {
+    if (optimizelevel==0)
+        print("\t%s(%s,%s,%s)\n"
             ,inst 
-            ,a->x.adrmode 
-            ,b->x.adrmode 
-            ,r->x.adrmode);
-    print("%s,%s,%s)\n", a->x.name, b->x.name, r->x.name);
+            ,output_arg(a)
+            ,output_arg(b)
+            ,output_arg(r));
+    else
+        print("\t%s_%c%c%c(%s,%s,%s)\n"
+            ,inst 
+            ,simple_adrmode(a->x.adrmode) 
+            ,simple_adrmode(b->x.adrmode) 
+            ,simple_adrmode(r->x.adrmode)
+            ,output_arg(a)
+            ,output_arg(b)
+            ,output_arg(r));
 }
 
-void unary(char *inst) {
-    print("\t%s_%c%c("
+static void unary(char *inst) {
+    if (optimizelevel==0)
+        print("\t%s(%s,%s)\n"
             ,inst
-            ,a->x.adrmode
-            ,r->x.adrmode);
-    print("%s,%s)\n", a->x.name, r->x.name);
+            ,output_arg(a)
+            ,output_arg(r));
+    else
+        print("\t%s_%c%c(%s,%s)\n"
+            ,inst
+            ,simple_adrmode(a->x.adrmode)
+            ,simple_adrmode(r->x.adrmode)
+            ,output_arg(a)
+            ,output_arg(r));
 }
 
-void compare0(char *inst) {
+static void compare0(char *inst) {
     print("\t%s_%c(%s,%s)\n" 
             ,inst
-            ,a->x.adrmode
-            ,a->x.name
+            ,simple_adrmode(a->x.adrmode)
+            ,output_arg(a)
             ,r->syms[0]->x.name);
 }
 
-void compare(char *inst) {
-    print("\t%s_%c%c("
+static void compare(char *inst) {
+     if (optimizelevel==0)
+        print("\t%s(%s,%s,%s)\n"
             ,inst
-            ,a->x.adrmode
-            ,b->x.adrmode);
-    print("%s,%s,%s)\n", a->x.name, b->x.name, r->syms[0]->x.name);
-}
-
-char adrmode(Node p) {
-    if (p->x.adrmode!='D') return p->x.adrmode;
-    return p->x.name[0]=='_' ? 'D': 'Z';
+            ,output_arg(a)
+            ,output_arg(b)
+            ,r->syms[0]->x.name);
+    else
+        print("\t%s_%c%c(%s,%s,%s)\n"
+            ,inst
+            ,simple_adrmode(a->x.adrmode)
+            ,simple_adrmode(b->x.adrmode)
+            ,output_arg(a)
+            ,output_arg(b)
+            ,r->syms[0]->x.name);
 }
 
 static void save_busy(Node p) {
@@ -617,7 +625,7 @@ static void save_busy(Node p) {
     for (int i=0; i<8; i++) {
         if (p->x.busy & (1<<i)) {
             // save on stack and increase the argsize
-            print("\tARGW_D(tmp%d,(sp),%d)\n", i, offset);
+            print("\tSAVE(tmp%d,(sp),%d)\n", i, offset);
             offset += 2;
         }
     }
@@ -630,12 +638,172 @@ static void restore_busy(Node p) {
     for (int i=7; i>=0; i--) { // reverse order
         if (p->x.busy & (1<<i)) {
             offset -= 2;
-            print("\tMOVW_ID((sp),%d,tmp%d)\n", offset, i);
+            print("\tRESTORE((sp),%d,tmp%d)\n", offset, i);
         }
     }
 }
 
-void emitdag(Node p) {
+static void emitdag0(Node p) {
+    a = p->kids[0]; b = p->kids[1]; r=p;
+    switch (p->op) {
+        case BANDU:  binary("BANDU");  break;
+        case BORU:   binary("BORU" );  break;
+        case BXORU:  binary("BXOR" );  break;
+        case ADDD:   binary("ADDD");   break;
+        case ADDF:   binary("ADDF");   break;
+        case ADDI:   binary("ADDI");   break;
+        case ADDP:   binary("ADDP");   break;
+        case ADDU:   binary("ADDU");   break;
+        case SUBD:   binary("SUBD");   break;
+        case SUBF:   binary("SUBF");   break;
+        case SUBI:   binary("SUBI");   break;
+        case SUBP:   binary("SUBP");   break;
+        case SUBU:   binary("SUBU");   break;
+        case MULD:   binary("MULD");   break;
+        case MULF:   binary("MULF");   break;
+        case MULI:   binary("MULI");   break;
+        case MULU:   binary("MULU");   break;
+        case DIVD:   binary("DIVD");   break;
+        case DIVF:   binary("DIVF");   break;
+        case DIVI:   binary("DIVI");   break;
+        case DIVU:   binary("DIVU");   break;
+        case MODI:   binary("MODI");   break;
+        case MODU:   binary("MODU");   break;
+        case RSHU:   binary("RSHU");   break;
+        case RSHI:   binary("RSHI");   break;
+        case LSHI:   binary("LSHW");   break;
+        case LSHU:   binary("LSHW");   break;
+        case INDIRC: unary("INDIRC");  break;
+        case INDIRS: unary("INDIRS");  break;
+        case INDIRI: unary("INDIRI");  break;
+        case INDIRP: unary("INDIRP");  break;
+        case INDIRD: unary("INDIRD");  break;
+        case INDIRF: unary("INDIRF");  break;
+        case INDIRB: unary("INDIRB");  break;
+        case BCOMU:  unary("BCOMU" );  break;
+        case NEGD:   unary("NEGD" );   break;
+        case NEGF:   unary("NEGF" );   break;
+        case NEGI:   unary("NEGI" );   break;
+        case CVCI:   unary("CVCI");    break;
+        case CVSI:   unary("CVSI");    break;
+        case CVCU:   unary("CVCU");    break;
+        case CVSU:   unary("CVSU");    break;
+        case CVUC:   unary("CVUC");    break;
+        case CVUS:   unary("CVUS");    break;
+        case CVIC:   unary("CVIC");    break;
+        case CVIS:   unary("CVIS");    break;
+        case CVPU:   unary("CVPU");    break;
+        case CVUP:   unary("CVUP");    break;
+        case CVIU:   unary("CVIU");    break;
+        case CVUI:   unary("CVUI");    break;
+        case CVID:   unary("CVID" );   break;
+        case CVDF:   unary("CVDF");    break;
+        case CVFD:   unary("CVFD");    break;
+        case CVDI:   unary("CVDI" );   break;
+        case RETD:   print("\tRETD(%s)\n",output_arg(a)); break;
+        case RETF:   print("\tRETF(%s)\n",output_arg(a)); break;
+        case RETI:   print("\tRETI(%s)\n",output_arg(a)); break;
+        case RETV:   print("\tRETV\n"); break;
+        case ADDRGP: print("\tADDRGP(%s,%s)\n"
+                        ,p->syms[0]->x.name
+                        ,output_arg(p)); break;
+        case ADDRFP: print("\tADDRFP(%s,%s)\n"
+                        ,p->syms[0]->x.name
+                        ,output_arg(p)); break;
+        case ADDRLP: print("\tADDRLP(%s,%s)\n"
+                        ,p->syms[0]->x.name
+                        ,output_arg(p)); break;
+        case CNSTC: print("\tCNSTC(%s,%s)\n" ,output_name(p->syms[0]) ,output_arg(p)); break;
+        case CNSTS: print("\tCNSTS(%s,%s)\n" ,output_name(p->syms[0]) ,output_arg(p)); break;
+        case CNSTI: print("\tCNSTI(%s,%s)\n" ,output_name(p->syms[0]) ,output_arg(p)); break; 
+        case CNSTU: print("\tCNSTU(%s,%s)\n" ,output_name(p->syms[0]) ,output_arg(p)); break;
+        case CNSTP: print("\tCNSTP(%s,%s)\n" ,output_name(p->syms[0]) ,output_arg(p)); break;
+        case JUMPV: print("\tJUMPV(%s)\n" , output_arg(a)); break;
+        case ASGNB: print("\tASGNB(%s,%s,%s)\n"
+                    ,output_arg(b)
+                    ,output_arg(a)
+                    ,output_name(p->syms[0])); break;
+        case ASGNC: print("\tASGNC(%s,%s)\n" ,output_arg(b) ,output_arg(a)); break;
+        case ASGNS: print("\tASGNS(%s,%s)\n" ,output_arg(b) ,output_arg(a)); break;
+        case ASGND: print("\tASGND(%s,%s)\n" ,output_arg(b) ,output_arg(a)); break; 
+        case ASGNF: print("\tASGNF(%s,%s)\n" ,output_arg(b) ,output_arg(a)); break;
+        case ASGNI: print("\tASGNI(%s,%s)\n" ,output_arg(b) ,output_arg(a)); break; 
+        case ASGNP: print("\tASGNP(%s,%s)\n" ,output_arg(b) ,output_arg(a)); break;
+        case ARGB:  print("\tARGB(%s,(sp),%d,%s)\n"
+                    ,output_arg(a)
+                    ,p->x.argoffset
+                    ,output_name(p->syms[0])); break;
+        case ARGD:  print("\tARGD(%s,%d)\n" ,output_arg(a) ,p->x.argoffset); break;
+        case ARGF:  print("\tARGF(%s,%d)\n" ,output_arg(a) ,p->x.argoffset); break;
+        case ARGI:  print("\tARGI(%s,%d)\n" ,output_arg(a) ,p->x.argoffset); break;
+        case ARGP:  print("\tARGP(%s,%d)\n" ,output_arg(a) ,p->x.argoffset); break;
+        case CALLB:
+            save_busy(p);
+            print("\tMOVW_%cD(%s,op1)\n"
+                    ,simple_adrmode(b->x.adrmode)
+                    ,output_arg(b));
+            print("\tCALLV(%s,%d)\n"
+                    ,output_arg(a)
+                    ,p->x.argoffset);
+            restore_busy(p);
+            break;
+        case CALLV:
+            save_busy(p);
+            print("\tCALLV(%s,%d)\n" ,output_arg(a) ,p->x.argoffset);
+            restore_busy(p);
+            break;
+        case CALLD:
+            save_busy(p);
+            print("\tCALLD(%s,%d,%s)\n"
+                    ,output_arg(a)
+                    ,p->x.argoffset
+                    ,output_arg(p));
+            restore_busy(p);
+            break;
+        case CALLF:
+            save_busy(p);
+            print("\tCALLF(%s,%d,%s)\n"
+                    ,output_arg(a)
+                    ,p->x.argoffset
+                    ,output_arg(p));
+            restore_busy(p);
+            break;
+        case CALLI:
+            save_busy(p);
+            print("\tCALLI(%s,%d,%s)\n"
+                    ,output_arg(a)
+                    ,p->x.argoffset
+                    ,output_arg(p));
+            restore_busy(p);
+            break;
+        case EQD:     compare("EQD" ); break;
+        case EQF:     compare("EQF" ); break;
+        case EQI:     compare("EQI" ); break;
+        case GED:     compare("GED" ); break;   
+        case GEF:     compare("GEF" ); break;
+        case GEI:     compare("GEI" ); break;
+        case GEU:     compare("GEU" ); break;
+        case GTD:     compare("GTD" ); break;   
+        case GTF:     compare("GTF" ); break;
+        case GTI:     compare("GTI" ); break;
+        case GTU:     compare("GTU" ); break;
+        case LED:     compare("LED" ); break;  
+        case LEF:     compare("LEF" ); break;
+        case LEI:     compare("LEI" ); break;
+        case LEU:     compare("LEU" ); break;
+        case LTD:     compare("LTD" ); break;  
+        case LTF:     compare("LTF" ); break;
+        case LTI:     compare("LTI" ); break;
+        case LTU:     compare("LTU" ); break;
+        case NED:     compare("NED" ); break;  
+        case NEF:     compare("NEF" ); break;
+        case NEI:     compare("NEI" ); break;
+        case LABELV: print("%s\n", p->syms[0]->x.name); break;
+        default: assert(0);
+    }
+}
+
+static void emitdag(Node p) {
 
     a = p->kids[0]; b = p->kids[1]; r=p;
 
@@ -645,23 +813,21 @@ void emitdag(Node p) {
         case BXORU:                       binary("XORW");   break;
         case ADDD:  case ADDF:            binary("ADDF");   break;
         case ADDI:  case ADDP:  case ADDU:
-            if (optimizelevel>=2 && strcmp(a->x.name,p->x.name)==0
-            && p->x.adrmode=='D'
-            && strcmp(b->x.name,"1")==0)
-                print("\tINCW_%c(%s)\n" 
-                        ,(p->x.name[0]=='_' || p->x.name[0]=='L')? 'D':'Z'
-                        ,p->x.name);
+            if (optimizelevel>=2
+                    && strcmp(a->x.name,p->x.name)==0 
+                    && strcmp(b->x.name,"1")==0
+                    && (p->x.adrmode=='Z' || p->x.adrmode=='D'))
+                print("\tINCW_%c(%s)\n" ,simple_adrmode(p->x.adrmode) ,output_arg(p));
             else
                 binary("ADDW");
             break;
         case SUBD:  case SUBF:            binary("SUBF");  break;
         case SUBI:  case SUBP:  case SUBU:
-            if (optimizelevel>=2 && strcmp(a->x.name,p->x.name)==0
-                    && p->x.adrmode=='D'
-                    && strcmp(b->x.name,"1")==0)
-                print("\tDECW_%c(%s)\n"
-                    ,(p->x.name[0]=='_' || p->x.name[0]=='L')? 'D':'Z'
-                    ,p->x.name);
+            if (optimizelevel>=2
+                    && strcmp(a->x.name,p->x.name)==0
+                    && strcmp(b->x.name,"1")==0
+                    && (p->x.adrmode=='Z' || p->x.adrmode=='D'))
+                print("\tDECW_%c(%s)\n" ,simple_adrmode(p->x.adrmode) ,output_arg(p));
             else
                 binary("SUBW");
             break;
@@ -682,18 +848,18 @@ void emitdag(Node p) {
         case INDIRC: case INDIRS:
             if (!p->x.optimized)
                 print("\tINDIRB_%c%c(%s,%s)\n"
-                        ,adrmode(a)
-                        ,r->x.adrmode
-                        ,a->x.name
-                        ,r->x.name);
+                        ,a->x.adrmode=='I' ? 'Y': a->x.adrmode     // keep 'Z' adrmode for better readibility
+                        ,simple_adrmode(r->x.adrmode)
+                        ,output_arg(a)
+                        ,output_arg(r));
             break;
         case INDIRI: case INDIRP:
             if (!p->x.optimized)
                 print("\tINDIRW_%c%c(%s,%s)\n"
-                        ,adrmode(a)
-                        ,r->x.adrmode
-                        ,a->x.name
-                        ,r->x.name);
+                        ,a->x.adrmode=='I' ? 'Y': a->x.adrmode     // keep 'Z' adrmode for better readibility
+                        ,simple_adrmode(r->x.adrmode)
+                        ,output_arg(a)
+                        ,output_arg(r));
             break;
         case INDIRD: case INDIRF:
             if (!p->x.optimized)
@@ -725,22 +891,22 @@ void emitdag(Node p) {
         case RETD: case RETF:
             if (optimizelevel>=2 && omit_frame && nbregs==0)
                 print("\tRETF_%c(%s)\n"
-                        ,a->x.adrmode
-                        ,a->x.name);
+                        ,simple_adrmode(a->x.adrmode)
+                        ,output_arg(a));
             else
                 print("\tLEAVEF_%c(%s)\n"
-                        ,a->x.adrmode
-                        ,a->x.name);
+                        ,simple_adrmode(a->x.adrmode)
+                        ,output_arg(a));
             break;
         case RETI:
             if (optimizelevel>=2 && omit_frame && nbregs==0)
                 print("\tRETW_%c(%s)\n"
-                        ,a->x.adrmode
-                        ,a->x.name);
+                        ,simple_adrmode(a->x.adrmode)
+                        ,output_arg(a));
             else
                 print("\tLEAVEW_%c(%s)\n"
-                        ,a->x.adrmode
-                        ,a->x.name);
+                        ,simple_adrmode(a->x.adrmode)
+                        ,output_arg(a));
             break;
         case RETV:
             if (optimizelevel>=2 && omit_frame && nbregs==0)
@@ -750,115 +916,114 @@ void emitdag(Node p) {
         case ADDRGP: case ADDRFP: case ADDRLP:
             if (optimizelevel==0)
                 print("\tADDR_%c%c(%s,%s)\n"
-                        ,p->syms[0]->x.adrmode
-                        ,p->x.adrmode
-                        ,p->syms[0]->x.name
-                        ,p->x.name);
+                        ,simple_adrmode(p->syms[0]->x.adrmode)
+                        ,simple_adrmode(p->x.adrmode)
+                        ,output_name(p->syms[0])
+                        ,output_arg(p));
             break;
         case CNSTC: case CNSTS:
         case CNSTI: case CNSTU:
         case CNSTP:
             if (optimizelevel==0)
                 print("\tCNST_%c%c(%s,%s)\n"
-                        ,p->syms[0]->x.adrmode
-                        ,p->x.adrmode
-                        ,p->syms[0]->name
-                        ,p->x.name);
+                        ,simple_adrmode(p->syms[0]->x.adrmode)
+                        ,simple_adrmode(p->x.adrmode)
+                        ,output_name(p->syms[0])
+                        ,output_arg(p));
             break;
         case JUMPV:
-            print("\tJUMP_%c(%s)\n"
-                    ,a->x.adrmode, a->x.name);
+            print("\tJUMP_%c(%s)\n" ,simple_adrmode(a->x.adrmode), output_arg(a));
             break;
         case ASGNB:
             print("\tASGNS_%c%c(%s,%s,%s)\n"
-                    ,b->x.adrmode
-                    ,a->x.adrmode
-                    ,b->x.name
-                    ,a->x.name
-                    ,p->syms[0]->x.name);
+                    ,simple_adrmode(b->x.adrmode)
+                    ,a->x.adrmode=='I' ? 'Y': a->x.adrmode     // keep 'Z' adrmode for better readibility
+                    ,output_arg(b)
+                    ,output_arg(a)
+                    ,output_name(p->syms[0]));
             break;
         case ASGNC: case ASGNS:
             if (!p->x.optimized)
                 print("\tASGNB_%c%c(%s,%s)\n"
-                        ,b->x.adrmode
-                        ,adrmode(a)
-                        ,b->x.name
-                        ,a->x.name);
+                        ,simple_adrmode(b->x.adrmode)
+                        ,a->x.adrmode=='I' ? 'Y': a->x.adrmode     // keep 'Z' adrmode for better readibility
+                        ,output_arg(b)
+                        ,output_arg(a));
             break;
         case ASGND: case ASGNF:
             if (!p->x.optimized)
                 print("\tASGNF_%c%c(%s,%s)\n"
-                        ,b->x.adrmode
-                        ,adrmode(a)
-                        ,b->x.name
-                        ,a->x.name);
+                        ,simple_adrmode(b->x.adrmode)
+                        ,a->x.adrmode=='I' ? 'Y': a->x.adrmode     // keep 'Z' adrmode for better readibility
+                        ,output_arg(b)
+                        ,output_arg(a));
             break;
         case ASGNI: case ASGNP:
             if (!p->x.optimized)
                 print("\tASGNW_%c%c(%s,%s)\n"
-                        ,b->x.adrmode
-                        ,adrmode(a)
-                        ,b->x.name
-                        ,a->x.name);
+                        ,simple_adrmode(b->x.adrmode)
+                        ,a->x.adrmode=='I' ? 'Y': a->x.adrmode     // keep 'Z' adrmode for better readibility
+                        ,output_arg(b)
+                        ,output_arg(a));
             break;
         case ARGB:
             print("\tARGS_%c(%s,(sp),%d,%s)\n"
-                    ,a->x.adrmode
-                    ,a->x.name
+                    ,simple_adrmode(a->x.adrmode)
+                    ,output_arg(a)
                     ,p->x.argoffset
-                    ,p->syms[0]->x.name);
+                    ,output_name(p->syms[0]));
             break;
         case ARGD: case ARGF:
             if (!p->x.optimized)
                 print("\tARGF_%c(%s,(sp),%d)\n"
-                        ,a->x.adrmode
-                        ,a->x.name
+                        ,simple_adrmode(a->x.adrmode)
+                        ,output_arg(a)
                         ,p->x.argoffset);
             break;
         case ARGI: case ARGP:
             if (!p->x.optimized)
                 print("\tARGW_%c(%s,(sp),%d)\n"
-                        ,a->x.adrmode
-                        ,a->x.name
+                        ,simple_adrmode(a->x.adrmode)
+                        ,output_arg(a)
                         ,p->x.argoffset);
             break;
         case CALLB:
             save_busy(p);
             print("\tMOVW_%cD(%s,op1)\n"
-                    ,b->x.adrmode
-                    ,b->x.name);
+                    ,simple_adrmode(b->x.adrmode)
+                    ,output_arg(b));
             print("\tCALLV_%c(%s,%d)\n"
-                    ,a->x.adrmode
-                    ,a->x.name
+                    ,simple_adrmode(a->x.adrmode)
+                    ,output_arg(a)
                     ,p->x.argoffset);
             restore_busy(p);
             break;
         case CALLV:
             save_busy(p);
             print("\tCALLV_%c(%s,%d)\n"
-                    ,a->x.adrmode
-                    ,a->x.name
+                    ,simple_adrmode(a->x.adrmode)
+                    ,output_arg(a)
                     ,p->x.argoffset);
             restore_busy(p);
             break;
         case CALLD: case CALLF:
             save_busy(p);
             print("\tCALLF_%c%c(%s,%d,%s)\n"
-                    ,a->x.adrmode
-                    ,p->x.adrmode
-                    ,a->x.name
+                    ,simple_adrmode(a->x.adrmode)
+                    ,simple_adrmode(p->x.adrmode)
+                    ,output_arg(a)
                     ,p->x.argoffset
-                    ,p->x.name);
+                    ,output_arg(p));
             restore_busy(p);
             break;
         case CALLI:
             save_busy(p);
             print("\tCALLW_%c%c(%s,%d,%s)\n"
-                    ,a->x.adrmode
-                    ,p->x.adrmode
-                    ,a->x.name
+                    ,simple_adrmode(a->x.adrmode)
+                    ,simple_adrmode(p->x.adrmode)
+                    ,output_arg(a)
                     ,p->x.argoffset
-                    ,p->x.name);
+                    ,output_arg(p));
             restore_busy(p);
             break;
         case EQD:   case EQF:             compare("EQF" ); break;
@@ -893,5 +1058,7 @@ void emitdag(Node p) {
 
 void emit(Node p) {
     if (graph_output) return;
-    for (; p; p=p->x.next) emitdag(p);
+    for (; p; p=p->x.next)
+        if (optimizelevel==0) emitdag0(p);
+        else emitdag(p);
 }
