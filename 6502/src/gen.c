@@ -1,6 +1,6 @@
 /* C compiler: 16 bits 6502 code generator */
 /* (C) Fabrice Frances 1997-2019 */
-char *version="/* 16-bit code V1.32 */\n";
+char *version="/* 16-bit code V1.33 */\n";
 #include "c.h"
 #include <string.h>
 #include <stdio.h>
@@ -502,15 +502,20 @@ static void tmpalloc(Node p) {
         if (optimizelevel>=3) {
         /* these conditions must be true to optimize (=get rid of) an ASGN node:
          * - it gets its value (right child node) from a temporary variable,
-         * - the ASGN node comes just after its right child node (TODO: could it be more general?)
+         * - the ASGN node comes just after its right child node 
+         *   (TODO: could it be more general? => re-ordering ?)
+         * - the left value is de-referenceable,
          * - and the temporary variable is not used afterwards,
          *
          * In this case, we try to directly assign the result inside the right child node
          * (as the result of this child node)
          */
-            if (optype(p->op)!=B
+            if (optype(p->op)!=B        // no optimization on ASGNB (struct) nodes
                 && p==right->x.next
-                && is_temporary(right->x.result))
+                && is_temporary(right->x.result)
+                && is_dereferenceable(left->x.adrmode)
+                && right->count==0
+                )
             {
                 p->x.optimized     = 1;
                 right->x.result    = left->x.result;
