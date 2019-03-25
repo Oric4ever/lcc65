@@ -3739,22 +3739,18 @@ skip :\
  bne *-15 :\
 
 #define ASGNS_AY(ptr1,y1,ptr2,y2,length)\
- ldy #y1 :\
- lda ptr1,y :\
- sta *+26 :\
- iny :\
- lda ptr1,y :\
- sta *+21 :\
  ldy #y2 :\
  lda ptr2,y :\
- sta *+15 :\
+ sta *+16 :\
  iny :\
  lda ptr2,y :\
- sta *+10 :\
+ sta *+11 :\
+ ldy #y1 :\
  ldx #0 :\
- lda $1234,x :\
+ lda ptr1,y :\
  sta $5678,x :\
  inx :\
+ iny :\
  cpx #length :\
  bne *-9 :\
 
