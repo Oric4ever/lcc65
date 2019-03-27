@@ -1,0 +1,34 @@
+Copyright (C) 1990,1991,1992 David R. Hanson
+All Rights Reserved.
+
+The lcc front end is protected by copyright.  It is not public-domain
+software, shareware, and it is not protected by a ``copyleft''
+agreement, like the code from the Free Software Foundation.
+
+The lcc front end is available free for your personal research and
+instructional use under the ``fair use'' provisions of the copyright
+law.  You may, however, redistribute the lcc front end in whole or in
+part provided you acknowledge its source and include this COPYRIGHT
+file.
+
+You may not sell the lcc front end or any product derived from it in
+which the front end is a significant part of the value of the product.
+Using the lcc front end to build a C syntax checker is an example of
+this kind of product.
+
+You may use the lcc front end in products as long as you charge for
+only those components that are entirely your own and you acknowledge
+the use of the lcc front end clearly in all product documentation and
+distribution media. You must state clearly that your product uses or is
+based on the lcc front end and that the lcc front end is available free
+of change.  You must also request that bug reports on your product be
+reported to you.  Using the lcc front end to build a C compiler for the
+Motorola 88000 chip and charging for and distributing only the 88000
+code generator is an example of this kind of product.
+
+Using parts of the lcc front end in other products is more problematic.
+For example, using parts of lcc in a C++ compiler could save
+substantial time and effort and therefore contribute significantly to
+the profitability of the product.  This kind of use, or any use where
+others stand to make a profit from what is primarily my work, is
+subject to negotiation.
