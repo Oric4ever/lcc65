@@ -1,3 +1,21 @@
+The lcc65 compiler is built by linking my 6502 back end (code generator)
+with Hanson & Fraser's lcc front end (version 1.9).
+The back end is distributed with a Creative Commons CC-BY-NC-SA licence,
+and the front end is Copyrighted by David R. Hanson (the full original 
+license is given at the end of this file).
+
+Copyright (C) 1997-2019 Fabrice Frances
+Creative Commons CC-BY-NC-SA
+
+Licensees may copy, distribute, display the 6502 back end and make 
+derivative works and remixes based on it only if they give the author 
+or licensor the credits (attribution) in the manner specified by these.
+Licensees may copy, distribute, display the 6502 back end and make 
+derivative works and remixes based on it only for non-commercial 
+purposes.
+Licensees may distribute derivative works only under a license identical
+("not more restrictive") to the license that governs the original work.
+
 Copyright (C) 1990,1991,1992 David R. Hanson
 All Rights Reserved.
 
