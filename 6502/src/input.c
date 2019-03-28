@@ -1,8 +1,12 @@
 /* C compiler: input processing */
 
 #include "c.h"
-#include <unistd.h>
 #include <string.h>
+#ifdef __unix__
+#include <unistd.h>
+#elif defined(_WIN32) || defined(_WIN64)
+#include <io.h>
+#endif
 
 unsigned char *cp;	/* current input character */
 char *file;		/* current input file name */

@@ -1,7 +1,12 @@
 /* C compiler: output functions */
 
 #include "c.h"
+#ifdef __unix__
 #include <unistd.h>
+#elif defined(_WIN32) || defined(_WIN64)
+#include <io.h>
+#endif
+
 
 static char buf1[4*1024], buf2[512];	/* output buffers */
 static struct io {

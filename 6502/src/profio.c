@@ -13,7 +13,12 @@
  */
 #include <string.h>
 #include <fcntl.h>
+#ifdef __unix__
 #include <unistd.h>
+#elif defined(_WIN32) || defined(_WIN64)
+#include <io.h>
+#endif
+
 
 struct file {			/* per-file prof.out data: */
 	struct file *link;		/* link to next file */

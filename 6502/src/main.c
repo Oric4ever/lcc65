@@ -2,9 +2,14 @@
 
 #include "version.h"
 #include "c.h"
-#include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#ifdef __unix__
+#include <unistd.h>
+#elif defined(_WIN32) || defined(_WIN64)
+#include <io.h>
+#endif
+
 extern void exit(int);
 extern double strtod(const char *, char **);
 extern long strtol(const char *, char **, int);
