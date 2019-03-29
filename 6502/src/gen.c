@@ -1,5 +1,58 @@
 /* C compiler: 16 bits 6502 code generator */
 /* (C) Fabrice Frances 1997-2019 */
+/*
+ * Implementation notes:
+ *
+ * The general structure of this backend follows the interfacing guidelines of 
+ * Hanson & Fraser's Retargetable C Compiler : a number of specified functions 
+ * have to be implemented by every backend, and the frontend and backend
+ * communicate information through a few structures (most important ones being
+ * the symbol structure and the node structure).
+ *
+ * Each backend defines specific extensions of these symbol and node structures
+ * in config.h (Xnode and Xsymbol), along with type metrics and a few other
+ * parameters.
+ *
+ * This 6502 backend aims to keep as simple as possible by introducing an
+ * intermediate language of macros, so that most of the time, there's a one to 
+ * one correspondence between the Operator Nodes passed by the frontend and
+ * the macros emitted by the backend. Recently, I added a graph output feature
+ * (-G) and renamed a little the macros to emphasize this one to one 
+ * correspondence...
+ *
+ * 
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ */
+
+
 char *version="/* 16-bit code V1.33 */\n";
 #include "c.h"
 #include <string.h>
@@ -163,10 +216,13 @@ void progbeg(int argc,char *argv[]) {
 
     /* No spilling for simplicity purpose: 
      * 32 temporaries for integer/pointer expressions, 32 for float expresssions.
-     * => very complex expressions will run out of temporaries and 
-     * raise a compilation error.
+     * => it should be nearly impossible to have such a complex expression
+     * that we run out of temporaries (a compilation error will be raised in such
+     * a pathological case).
      * All 32 integer/pointer temporaries in page zero, 
      * and all 32 floating-point temporaries on stack frame.
+     * => the runtime has to declare enough temporaries in zero page, 
+     * previous versions only used tmp0-tmp7...
      */
     for (i=0;i<32;i++) {
         temp[i]     = newtemp(STATIC,I);
@@ -552,10 +608,17 @@ static Node a,b,r;
 
 /* avoid some proliferation of macros by rewriting
  * Zero-Page address mode as Direct address mode,
+ * Register addresses as Constants,
  * and Indirect address mode as Indirect Y-indexed
  */
 static char simple_adrmode(char adrmode) {
     if (adrmode=='Z') return 'D';
+    else if (adrmode=='R') return 'C';
+    else if (adrmode=='I') return 'Y';
+    else return adrmode; 
+}
+static char reduced_adrmode(char adrmode) {
+    if (adrmode=='R') return 'C';
     else if (adrmode=='I') return 'Y';
     else return adrmode; 
 }
@@ -853,7 +916,7 @@ static void emitdag(Node p) {
         case INDIRC: case INDIRS:
             if (!p->x.optimized)
                 print("\tINDIRB_%c%c(%s,%s)\n"
-                        ,a->x.adrmode=='I' ? 'Y': a->x.adrmode     // keep 'Z' adrmode for better readibility
+                        ,reduced_adrmode(a->x.adrmode)    // keep 'Z' adrmode different from 'D'
                         ,simple_adrmode(r->x.adrmode)
                         ,output_arg(a)
                         ,output_arg(r));
@@ -861,7 +924,7 @@ static void emitdag(Node p) {
         case INDIRI: case INDIRP:
             if (!p->x.optimized)
                 print("\tINDIRW_%c%c(%s,%s)\n"
-                        ,a->x.adrmode=='I' ? 'Y': a->x.adrmode     // keep 'Z' adrmode for better readibility
+                        ,reduced_adrmode(a->x.adrmode)    // keep 'Z' adrmode different from 'D'
                         ,simple_adrmode(r->x.adrmode)
                         ,output_arg(a)
                         ,output_arg(r));
@@ -942,7 +1005,7 @@ static void emitdag(Node p) {
         case ASGNB:
             print("\tASGNS_%c%c(%s,%s,%s)\n"
                     ,simple_adrmode(b->x.adrmode)
-                    ,a->x.adrmode=='I' ? 'Y': a->x.adrmode     // keep 'Z' adrmode for better readibility
+                    ,reduced_adrmode(a->x.adrmode)     // keep 'Z' adrmode different from 'D'
                     ,output_arg(b)
                     ,output_arg(a)
                     ,output_name(p->syms[0]));
@@ -951,7 +1014,7 @@ static void emitdag(Node p) {
             if (!p->x.optimized)
                 print("\tASGNB_%c%c(%s,%s)\n"
                         ,simple_adrmode(b->x.adrmode)
-                        ,a->x.adrmode=='I' ? 'Y': a->x.adrmode     // keep 'Z' adrmode for better readibility
+                        ,reduced_adrmode(a->x.adrmode)     // keep 'Z' adrmode different from 'D'
                         ,output_arg(b)
                         ,output_arg(a));
             break;
@@ -959,7 +1022,7 @@ static void emitdag(Node p) {
             if (!p->x.optimized)
                 print("\tASGNF_%c%c(%s,%s)\n"
                         ,simple_adrmode(b->x.adrmode)
-                        ,a->x.adrmode=='I' ? 'Y': a->x.adrmode     // keep 'Z' adrmode for better readibility
+                        ,reduced_adrmode(a->x.adrmode)     // keep 'Z' adrmode different from 'D'
                         ,output_arg(b)
                         ,output_arg(a));
             break;
@@ -967,7 +1030,7 @@ static void emitdag(Node p) {
             if (!p->x.optimized)
                 print("\tASGNW_%c%c(%s,%s)\n"
                         ,simple_adrmode(b->x.adrmode)
-                        ,a->x.adrmode=='I' ? 'Y': a->x.adrmode     // keep 'Z' adrmode for better readibility
+                        ,reduced_adrmode(a->x.adrmode)     // keep 'Z' adrmode different from 'D'
                         ,output_arg(b)
                         ,output_arg(a));
             break;
