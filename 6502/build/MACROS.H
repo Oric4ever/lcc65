@@ -1,4 +1,4 @@
-/* macros v1.32 for the 6502 code generator, F.Frances */
+/* macros v1.33 for the 6502 code generator, F.Frances */
 
 #ifdef XA
 #define LOW <
@@ -174,6 +174,13 @@
  lda tmp1+1 :\
  rts :\
 
+#define RETW_Y(ptr1,y1)\
+ ldy #y1 :\
+ lda ptr1,y :\
+ tax :\
+ iny :\
+ lda ptr1,y :\
+ rts :\
 
 #define CNST_CD(cte1,tmp)\
  ldx #LOW(cte1) :\
@@ -418,8 +425,6 @@ skip :\
  iny :\
  sta ptr2,y :\
 
-#define INDIRB_RD(var1,tmp2) INDIRB_CD(var1,tmp2)
-
 #define INDIRB_CD(var1,tmp2)\
  lda var1 :\
  sta tmp2 :\
@@ -429,12 +434,30 @@ skip :\
  lda (ptr1),y :\
  sta tmp2 :\
 
+#define INDIRB_DD(var1, tmp2)\
+ lda var1 :\
+ sta tmp :\
+ lda var1+1 :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda (tmp),y :\
+ sta tmp2 :\
+
 #define INDIRB_AD(ptr1,y1,tmp2)\
  ldy #y1 :\
  lda ptr1,y :\
  sta tmp2 :\
 
-#define INDIRB_RY(var1,ptr2,y2) INDIRB_CY(var1,ptr2,y2)
+#define INDIRB_YD(ptr1,y1,tmp2)\
+ ldy #y1 :\
+ lda ptr1,y :\
+ sta tmp :\
+ iny :\
+ lda ptr1,y :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda (tmp),y ;\
+ sta tmp2 :\
 
 #define INDIRB_CY(var1,ptr2,y2)\
  ldy #y2 :\
@@ -447,13 +470,33 @@ skip :\
  ldy #y2 :\
  sta ptr2,y :\
 
+#define INDIRB_DY(var1,ptr2,y2)\
+ lda var1 :\
+ sta tmp :\
+ lda var1+1 :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda (tmp),y :\
+ ldy #y2 :\
+ sta ptr2,y :\
+
 #define INDIRB_AY(ptr1,y1,ptr2,y2)\
  ldy #y1 :\
  lda ptr1,y :\
  ldy #y2 :\
  sta ptr2,y :\
 
-#define INDIRW_RD(var1,tmp2) INDIRW_CD(var1,tmp2)
+#define INDIRB_YY(ptr1,y1,ptr2,y2)\
+ ldy #y1 :\
+ lda ptr1,y :\
+ sta tmp :\
+ iny :\
+ lda ptr1,y :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda (tmp),y ;\
+ ldy #y2 :\
+ sta ptr2,y :\
 
 #define INDIRW_CD(var1,tmp2)\
  lda var1 :\
@@ -470,6 +513,18 @@ skip :\
  stx tmp2 :\
  sta tmp2+1 :\
 
+#define INDIRW_DD(var1,var2)\
+ lda var1 :\
+ sta tmp :\
+ lda var1+1 :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda (tmp),y :\
+ sta var2 :\
+ iny :\
+ lda (tmp),y :\
+ sta var2+1 :\
+
 #define INDIRW_AD(ptr1,y1,tmp2)\
  ldy #y1 :\
  lda ptr1,y :\
@@ -478,7 +533,19 @@ skip :\
  lda ptr1,y :\
  sta tmp2+1 :\
 
-#define INDIRW_RY(var1,ptr2,y2) INDIRW_CY(var1,ptr2,y2)
+#define INDIRW_YD(ptr1,y1,tmp2)\
+ ldy #y1 :\
+ lda ptr1,y :\
+ sta tmp :\
+ iny :\
+ lda ptr1,y :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda (tmp),y ;\
+ sta tmp2 :\
+ iny :\
+ lda (tmp),y :\
+ sta tmp2+1 :\
 
 #define INDIRW_CY(var1,ptr2,y2)\
  ldy #y2 :\
@@ -498,6 +565,20 @@ skip :\
  ldy #y2+1 :\
  sta ptr2,y :\
 
+#define INDIRW_DY(var1,ptr2,y2)\
+ lda var1 :\
+ sta tmp :\
+ lda var1+1 :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda (tmp),y :\
+ ldy #y2 :\
+ sta ptr2,y2 :\
+ ldy #1 :\
+ lda (tmp),y :\
+ ldy #y2+1 :\
+ sta ptr2,y2 :\
+
 #define INDIRW_AY(ptr1,y1,ptr2,y2)\
  ldy #y1 :\
  lda ptr1,y :\
@@ -508,7 +589,21 @@ skip :\
  ldy #y2+1 :\
  sta ptr2,y :\
 
-#define INDIRS_RD(var1,tmp2) INDIRS_CD(var1,tmp2)
+#define INDIRW_YY(ptr1,y1,ptr2,y2)\
+ ldy #y1 :\
+ lda ptr1,y :\
+ sta tmp :\
+ iny :\
+ lda ptr1,y :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda (tmp),y ;\
+ ldy #y2 :\
+ sta ptr2,y :\
+ ldy #1 :\
+ lda (tmp),y :\
+ ldy #y2+1 :\
+ sta ptr2,y :\
 
 #define INDIRS_CD(var1,tmp2)\
  lda #LOW(var1) :\
@@ -3447,8 +3542,6 @@ skip :\
  txa :\
  sta ptr3,y :\
 
-#define ASGNB_CR(cte1,reg2) ASGNB_CC(cte1,reg2)
-
 #define ASGNB_CC(cte1,var2)\
  lda #LOW(cte1) :\
  sta var2 :\
@@ -3458,12 +3551,30 @@ skip :\
  lda #LOW(cte1) :\
  sta (ptr2),y :\
 
+#define ASGNB_CD(cte1,var2)\
+ lda var2 :\
+ sta tmp :\
+ lda var2+1 :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda #LOW(cte1) :\
+ sta (tmp),y :\
+
 #define ASGNB_CA(cte1,ptr2,y2)\
  ldy #y2 :\
  lda #LOW(cte1) :\
  sta ptr2,y :\
 
-#define ASGNB_DR(tmp1,reg2) ASGNB_DC(tmp1,reg2)
+#define ASGNB_CY(cte1,ptr2,y2)\
+ ldy #y2 :\
+ lda ptr2,y :\
+ sta tmp :\
+ iny :\
+ lda ptr2,y :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda #LOW(cte1) :\
+ sta (tmp),y :\
 
 #define ASGNB_DC(tmp1,var2)\
  lda tmp1 :\
@@ -3474,12 +3585,30 @@ skip :\
  lda tmp1 :\
  sta (ptr2),y :\
 
+#define ASGNB_DD(tmp1,var2)\
+ lda var2 :\
+ sta tmp :\
+ lda var2+1 :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda tmp1 :\
+ sta (tmp),y :\
+
 #define ASGNB_DA(tmp1,ptr2,y2)\
  ldy #y2 :\
  lda tmp1 :\
  sta ptr2,y :\
 
-#define ASGNB_YR(ptr1,y1,reg2) ASGNB_YC(ptr1,y1,reg2)
+#define ASGNB_DY(tmp1,ptr2,y2)\
+ ldy #y2 :\
+ lda ptr2,y :\
+ sta tmp :\
+ iny :\
+ lda ptr2,y :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda tmp1 :\
+ sta (tmp),y :\
 
 #define ASGNB_YC(ptr1,y1,var2)\
  ldy #y1 :\
@@ -3492,13 +3621,33 @@ skip :\
  ldy #0 :\
  sta (ptr2),y :\
 
+#define ASGNB_YD(ptr1,y1,var2)\
+ lda var2 :\
+ sta tmp :\
+ lda var2+1 :\
+ sta tmp+1 :\
+ ldy #y1 :\
+ lda ptr1,y :\
+ ldy #0 :\
+ sta (tmp),y :\
+
 #define ASGNB_YA(ptr1,y1,ptr2,y2)\
  ldy #y1 :\
  lda ptr1,y :\
  ldy #y2 :\
  sta ptr2,y :\
 
-#define ASGNW_CR(cte1,reg2) ASGNW_CC(cte1,reg2)
+#define ASGNB_YY(ptr1,y1,ptr2,y2)\
+ ldy #y2 :\
+ lda ptr2,y :\
+ sta tmp :\
+ iny :\
+ lda ptr2,y :\
+ sta tmp+1 :\
+ ldy #y1 :\
+ lda ptr1,y :\
+ ldy #0 :\
+ sta (tmp),y :\
 
 #define ASGNW_CC(cte1,var2)\
  lda #LOW(cte1) :\
@@ -3514,6 +3663,18 @@ skip :\
  lda #HIGH(cte1) :\
  sta (ptr2),y :\
 
+#define ASGNW_CD(cte1,var2)\
+ lda var2 :\
+ sta tmp :\
+ lda var2+1 :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda #LOW(cte1) :\
+ sta (tmp),y :\
+ iny :\
+ lda #HIGH(cte1) :\
+ sta (tmp),y :\
+
 #define ASGNW_CA(cte1,ptr2,y2)\
  ldy #y2 :\
  lda #LOW(cte1) :\
@@ -3522,13 +3683,37 @@ skip :\
  lda #HIGH(cte1) :\
  sta ptr2,y :\
 
-#define ASGNW_DR(tmp1,reg2) ASGNW_DC(tmp1, reg2)
+#define ASGNW_CY(cte1,ptr2,y2)\
+ ldy #y2 :\
+ lda ptr2,y :\
+ sta tmp :\
+ iny :\
+ lda ptr2,y :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda #LOW(cte1) :\
+ sta (tmp),y :\
+ iny :\
+ lda #HIGH(cte1) :\
+ sta (tmp),y :\
 
 #define ASGNW_DC(tmp1,var2)\
  lda tmp1 :\
  sta var2 :\
  lda tmp1+1 :\
  sta var2+1 :\
+
+#define ASGNW_DD(tmp1,var2)\
+ lda var2 :\
+ sta tmp :\
+ lda var2+1 :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda tmp1 :\
+ sta (tmp),y :\
+ iny :\
+ lda tmp1+1 :\
+ sta (tmp),y :\
 
 #define ASGNW_DZ(tmp1,ptr2)\
  ldy #0 :\
@@ -3546,7 +3731,19 @@ skip :\
  lda tmp1+1 :\
  sta ptr2,y :\
 
-#define ASGNW_AR(ptr1,y1,reg2) ASGNW_AC(ptr1,y1,reg2)
+#define ASGNW_DY(tmp1,ptr2,y2)\
+ ldy #y2 :\
+ lda ptr2,y :\
+ sta tmp :\
+ iny :\
+ lda ptr2,y :\
+ sta tmp+1 :\
+ ldy #0 :\
+ lda tmp1 :\
+ sta (tmp),y :\
+ iny :\
+ lda tmp1+1 :\
+ sta (tmp),y :\
 
 #define ASGNW_AC(ptr1,y1,var2)\
  clc :\
@@ -3568,6 +3765,21 @@ skip :\
  adc #0 :\
  sta (ptr2),y :\
 
+#define ASGNW_AD(ptr1,y1,var2)\
+ lda var2 :\
+ sta tmp :\
+ lda var2+1 :\
+ sta tmp+1 :\
+ clc :\
+ lda 0+ptr1 :\
+ adc #y1 :\
+ ldy #0 :\
+ sta (tmp),y :\
+ iny :\
+ lda 1+ptr1 :\
+ adc #0 :\
+ sta (tmp),y :\
+
 #define ASGNW_AA(ptr1,y1,ptr2,y2)\
  clc :\
  lda 0+ptr1 :\
@@ -3579,7 +3791,21 @@ skip :\
  adc #0 :\
  sta ptr2,y :\
 
-#define ASGNW_YR(ptr1,y1,reg2) ASGNW_YC(ptr1,y1,reg2)
+#define ASGNW_AY(ptr1,y1,ptr2,y2)\
+ ldy #y2 :\
+ lda ptr2,y :\
+ sta tmp :\
+ iny :\
+ lda ptr2,y :\
+ sta tmp+1 :\
+ ldy #y1 :\
+ lda ptr1,y :\
+ ldy #0 :\
+ sta (tmp),y :\
+ ldy #y1+1 :\
+ lda ptr1,y :\
+ ldy #1 :\
+ sta (tmp),y :\
 
 #define ASGNW_YC(ptr1,y1,var2)\
  ldy #y1 :\
@@ -3599,6 +3825,20 @@ skip :\
  ldy #1 :\
  sta (ptr2),y :\
 
+#define ASGNW_YD(ptr1,y1,var2)\
+ lda var2 :\
+ sta tmp :\
+ lda var2+1 :\
+ sta tmp+1 :\
+ ldy #y1 :\
+ lda ptr1,y :\
+ lda #0 :\
+ sta (tmp),y :\
+ ldy #y1+1 :\
+ lda ptr1,y :\
+ ldy #1 :\
+ sta (tmp),y :\
+
 #define ASGNW_YA(ptr1,y1,ptr2,y2)\
  ldy #y1 :\
  lda ptr1,y :\
@@ -3608,6 +3848,22 @@ skip :\
  lda ptr1,y :\
  ldy #y2+1 :\
  sta ptr2,y :\
+
+#define ASGNW_YY(ptr1,y1,ptr2,y2)\
+ ldy #y2 :\
+ lda ptr2,y :\
+ sta tmp :\
+ iny :\
+ lda ptr2,y :\
+ sta tmp+1 :\
+ ldy #y1 :\
+ lda ptr1,y :\
+ ldy #0 :\
+ sta (tmp),y :\
+ ldy #y1+1 :\
+ lda ptr1,y :\
+ ldy #1 :\
+ sta (tmp),y :\
 
 #define ASGNS_CR(adr1,reg2,length) \
  ldx #0 :\
