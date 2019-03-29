@@ -61,7 +61,8 @@ point* struct_ptr_global = &struct_global;
 int    (*fct_ptr_global)(int) = int_funct;
 
 void check(int result, int expected, char *msg) {
-    if (result == expected) printf("%s test ok\n",msg);
+    if (result == expected)  // putchar('.');
+        printf("%s test ok\n", msg);
     else printf("%s test fails\n-> result is %d, expecting %d\n", msg, result, expected);
 }
 
@@ -129,16 +130,33 @@ void struct_tests() {
     point* struct_ptr_local = &struct_local;
     struct_ptr_global->y = 1;
 
+    check(struct_global.y, 1, "struct funct0");
+
     struct_local = struct_funct(struct_global);
-    check(struct_local.y, struct_global.y+3, "struct funct1");
+    check(struct_local.y, 4, "struct funct1");
 
     struct_global = struct_funct(struct_local);
-    check(struct_global.y, struct_local.y+3, "struct funct2");
+    check(struct_global.y, 7, "struct funct2");
 
     struct_ptr_local = struct_ptr_funct(struct_ptr_global);
     check((int)struct_ptr_local, (int)struct_ptr_global, "struct ptr funct");
-    check(struct_ptr_local->y, 4, "struct ptr funct");
+    check(struct_ptr_local->y, 10, "struct ptr funct");
 
+}
+
+void addr_tests()
+{
+    int a = 1, b;
+    b = a + (int)&a;
+    b = (int)&a + a;
+    b = a -  (int)&a;
+    b = (int)&a - a;
+    b = a * (int)&a;
+    b = (int)&a * a;
+    b = (int)&a / a;
+    b = a / (int)&a;
+    b = a & (int)&a;
+    b = (int)&a & a;
 }
 
 int main(void)
@@ -147,4 +165,5 @@ int main(void)
     simple_ptr_tests();
     fct_ptr_tests();
     struct_tests();
+    printf("\nAll tests done\n");
 }
