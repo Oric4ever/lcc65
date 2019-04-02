@@ -135,7 +135,7 @@ static Tree call(f, fty, src) Tree f; Type fty; Coordinate src; {
 						n + 1, funcname(f), q->type, *proto);
 				proto++;
 			} else {
-				if (fty->u.proto && proto == 0)
+				if (fty->u.proto && (proto == 0 || *proto == 0))
 					error("too many arguments to %s\n", funcname(f));
 				q = value(q);
 				if (q->type == floattype)
