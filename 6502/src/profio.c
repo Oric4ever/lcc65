@@ -5,7 +5,7 @@
  *    name
  *    ... (#files-1 times)
  *    #functions
- *    name file# x y count caller file x y 
+ *    name file# x y count caller file x y
  *    ... (#functions-1 times)
  *    #points
  *    file# x y count
@@ -13,12 +13,7 @@
  */
 #include <string.h>
 #include <fcntl.h>
-#ifdef __unix__
 #include <unistd.h>
-#elif defined(_WIN32) || defined(_WIN64)
-#include <io.h>
-#endif
-
 
 struct file {			/* per-file prof.out data: */
 	struct file *link;		/* link to next file */
@@ -114,7 +109,7 @@ static struct func *afunction(name, file, x, y, count) char *name, *file; int x,
 	return q;
 }
 
-/* apoint - append execution point i to file's data */ 
+/* apoint - append execution point i to file's data */
 static void apoint(i, file, x, y, count) char *file; int i,x,y,count; {
 	struct file *p = findfile(file);
 
@@ -301,7 +296,7 @@ int process(file) char *file; {
 			qsort(p->counts, p->count, sizeof *p->counts,
 				(dclproto(int (*),(const void *, const void *)))
 				compare);
-		
+
 		return 1;
 	}
 #endif

@@ -25,7 +25,7 @@ Table identifiers = &tidentifiers;	/* identifiers */
 Table globals	  = &tidentifiers;	/* globals */
 Table labels[2];			/* labels */
 Table types	  = &ttypes;		/* types */
-	
+
 int bnumber;				/* current block number */
 int level;				/* current block level */
 List symbols;				/* list of all symbols; used only if xref != 0 */
@@ -114,10 +114,8 @@ void fielduses(p, cl) Symbol p; Generic cl; {
 /* findlabel - lookup/install label lab in the labels table */
 Symbol findlabel(int lab) {
 	char *label = stringd(lab);
-	Symbol p;
-
-	if (p = lookup(label, labels[1]))
-		return p;
+	Symbol p = lookup(label, labels[1]);
+	if (p) return p;
 	p = install(label, &labels[1], 0);
 	p->generated = 1;
 	p->u.l.label = lab;
@@ -138,7 +136,7 @@ Symbol findtype(ty) Type ty; {
 			for (p = tp->buckets[i]; p; p = p->link)
 				if (p->sym.type == ty && p->sym.sclass == TYPEDEF)
 					return &p->sym;
-	while (tp = tp->previous);
+	while ((tp = tp->previous));
 	return 0;
 }
 
@@ -146,8 +144,8 @@ Symbol findtype(ty) Type ty; {
 void foreach(tp, lev, apply, cl)
 Table tp;
 int lev;
-dclproto(void (*apply),(Symbol, Generic)); 
-Generic cl; 
+dclproto(void (*apply),(Symbol, Generic));
+Generic cl;
 {
 	assert(tp);
 	while (tp && tp->level > lev)
@@ -239,7 +237,7 @@ Symbol lookup(name, tp) char *name; Table tp; {
 		for (p = tp->buckets[h]; p; p = p->link)
 			if (name == p->sym.name)
 				return &p->sym;
-	while (tp = tp->previous);
+	while ((tp = tp->previous));
 	return 0;
 }
 
@@ -298,7 +296,7 @@ void setuses(tp) Table tp; {
 		for (i = 0; i < HASHSIZE; i++)
 			for (p = tp->buckets[i]; p; p = p->link) {
 				if (p->refs)
-					p->sym.uses = (Coordinate **)ltoa(p->refs, 0);
+					p->sym.uses = (Coordinate **)list_to_a(p->refs, 0);
 				p->refs = 0;
 				symbols = append((Generic)&p->sym, symbols);
 			}

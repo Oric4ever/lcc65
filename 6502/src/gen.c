@@ -3,8 +3,8 @@
 /*
  * Implementation notes:
  *
- * The general structure of this backend follows the interfacing guidelines of 
- * Hanson & Fraser's Retargetable C Compiler : a number of specified functions 
+ * The general structure of this backend follows the interfacing guidelines of
+ * Hanson & Fraser's Retargetable C Compiler : a number of specified functions
  * have to be implemented by every backend, and the frontend and backend
  * communicate information through a few structures (most important ones being
  * the symbol structure and the node structure).
@@ -13,42 +13,12 @@
  * in config.h (Xnode and Xsymbol), along with type metrics and a few other
  * parameters.
  *
- * This 6502 backend aims to keep as simple as possible by introducing an
- * intermediate language of macros, so that most of the time, there's a one to 
+ * This 6502 backend aims to be kept as simple as possible by introducing an
+ * intermediate language of macros, so that most of the time, there's a one to
  * one correspondence between the Operator Nodes passed by the frontend and
  * the macros emitted by the backend. Recently, I added a graph output feature
- * (-G) and renamed a little the macros to emphasize this one to one 
+ * (-G) and renamed a little the macros to emphasize this one to one
  * correspondence...
- *
- * 
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
  *
  */
 
@@ -68,7 +38,6 @@ static int tmpsize;          /* max size of temporary variables */
 static int nbregs;           /* number of used registers */
 static unsigned busy;        /* busy&(1<<t) == 1 if tmp t is used */
 static unsigned busy_flt;    /* busy_flt&(1<<t) == 1 if tmp t is used */
-static char *callname;       /* current function called name */
 static char *NamePrefix;     /* Prefix for all local names */
 static int omit_frame;       /* if no params and no locals */
 static int optimizelevel=3;  /* set by command line option -On */
@@ -76,7 +45,7 @@ static Symbol temp[32];      /* 32 symbols pointing to temporary variables... */
 static Symbol flt_temp[32];  /* 32 symbols pointing to temporary floating-point variables... */
 static char *regname[8];     /* 8 register variables names */
 
-static char *opcode_names[] = { 
+static char *opcode_names[] = {
     NULL,"CNST","ARG","ASGN","INDIR","CVC","CVD","CVF","CVI","CVP",
     "CVS","CVU","NEG","CALL","LOAD","RET","ADDRG","ADDRF","ADDRL","ADD",
     "SUB","LSH","MOD","RSH","BAND","BCOM","BOR","BXOR","DIV","MUL",
@@ -85,7 +54,7 @@ static char type_name[] = " FDCSIUPVB??????";
 static char *additional_operators[] = {
     "AND","NOT","OR","COND","RIGHT","FIELD" };
 
-static void print_node(Node p) {
+void print_node(Node p) {
     fprintf(stderr,"Node %s%c\n",
             opcode_names[generic(p->op)>>4], type_name[optype(p->op)]);
     fprintf(stderr,"Node addr: %p\n", p);
@@ -114,7 +83,7 @@ static void print_graph_node(Node p) {
     if (p->op < MAXOP)
         printf("\t%s%p [label=\"%s%c\"];\n", fname, p,
             opcode_names[generic(p->op)>>4], type_name[optype(p->op)]);
-    else printf("\t%s%p [label=\"%s\"];\n", fname, p, 
+    else printf("\t%s%p [label=\"%s\"];\n", fname, p,
             additional_operators[p->op - MAXOP]);
 
     switch (generic(p->op)) {
@@ -130,7 +99,7 @@ static void print_graph_node(Node p) {
         printf("\t%s%p -> N%p [style=dotted,label=\"label\"];\n",fname,p,s);
 
     case ASGN:
-    case ADD: case SUB: case BAND: case BOR: case BXOR: 
+    case ADD: case SUB: case BAND: case BOR: case BXOR:
     case DIV: case LSH: case MOD: case MUL: case RSH:
         /* 2 kids */
         printf("\t%s%p -> %s%p [label=\"left\"];\n",fname,p,fname,left);
@@ -141,7 +110,7 @@ static void print_graph_node(Node p) {
     case CVC: case CVD: case CVF: case CVI: case CVP: case CVS: case CVU:
     case INDIR: case NEG:
     case JUMP:
-    case ARG: 
+    case ARG:
         /* 1 kid */
         printf("\t%s%p -> %s%p;\n",fname,p,fname,left);
         break;
@@ -165,7 +134,7 @@ static Node *linearize(Node p, Node *last, Node next) {
     if (p && !p->x.visited) {
         if ( optimizelevel>0 ) {
             switch (generic(p->op)) {
-            case CNST: 
+            case CNST:
             case ADDRG: case ADDRL: case ADDRF:
                 p->x.optimized=1;
                 p->x.result=p->syms[0];
@@ -214,14 +183,14 @@ void progbeg(int argc,char *argv[]) {
     /* 8 virtual registers */
     for (i=0;i<8;i++) regname[i]=stringf("reg%d",i);
 
-    /* No spilling for simplicity purpose: 
+    /* No spilling for simplicity purpose:
      * 32 temporaries for integer/pointer expressions, 32 for float expresssions.
      * => it should be nearly impossible to have such a complex expression
      * that we run out of temporaries (a compilation error will be raised in such
      * a pathological case).
-     * All 32 integer/pointer temporaries in page zero, 
+     * All 32 integer/pointer temporaries in page zero,
      * and all 32 floating-point temporaries on stack frame.
-     * => the runtime has to declare enough temporaries in zero page, 
+     * => the runtime has to declare enough temporaries in zero page,
      * previous versions only used tmp0-tmp7...
      */
     for (i=0;i<32;i++) {
@@ -272,7 +241,7 @@ void printfloat(double val)
     int i,exp=32,negative=0;
     double two_pow31,two_pow32;
     unsigned long mantissa;
-    
+
     if (val==0.0) {
         print("\tDB(0)\n");
         print("\tDB(0)\n");
@@ -343,12 +312,12 @@ void defstring(int len, char *s) {
 
 void defaddress(Symbol p) {
     if (graph_output) return;
-    print("\tDW(%s)\n",p->x.name); 
+    print("\tDW(%s)\n",p->x.name);
 }
 
 void space(int n) {
     if (graph_output) return;
-    print("\tZERO(%d)\n",n); 
+    print("\tZERO(%d)\n",n);
 }
 
 int allocreg(Symbol p) {
@@ -356,6 +325,7 @@ int allocreg(Symbol p) {
     p->x.name=regname[nbregs];
     p->x.adrmode='R';
     nbregs++;
+    return 1;
 }
 
 void function(Symbol f, Symbol caller[], Symbol callee[], int ncalls) {
@@ -465,11 +435,11 @@ static void releasetmp(Node p) {
     }
 }
 
-static void print_busy() {
+void print_busy() {
     if (busy) fprintf(stderr,"Busy tmps when calling function: %x\n", busy);
     if (busy_flt) fprintf(stderr,"Busy flt_tmps when calling function: %x\n", busy_flt);
 }
-            
+
 static bool is_dereferenceable(char adrmode)
 {
     return adrmode=='C' || adrmode=='R' || adrmode=='A' || adrmode=='Z';
@@ -477,17 +447,20 @@ static bool is_dereferenceable(char adrmode)
 
 static char dereference(char adrmode)
 {
-    assert(is_dereferenceable(adrmode));
     switch (adrmode) {
         case 'C': return 'D';
         case 'R': return 'Z';
         case 'A': return 'Y';
         case 'Z': return 'I';
+        default:
+            assert(is_dereferenceable(adrmode));
+            return 0;
     }
+
 }
 
 static int needtmp(Node p) {
-    Node left = p->kids[0], right = p->kids[1];
+    Node left = p->kids[0];
     if (graph_output) return 0;
     switch (generic(p->op)) {
         case ADDRF: case ADDRG: case ADDRL:
@@ -503,10 +476,10 @@ static int needtmp(Node p) {
                     p->x.adrmode   = left->x.adrmode;
                     return 0;
                 }
-                
+
             if (optimizelevel>=3) {
         /* these conditions must be true to optimize (=get rid of) an INDIR node:
-         * - this INDIR node is referenced only once 
+         * - this INDIR node is referenced only once
          *   (otherwise by delaying the indirection in parent nodes we would duplicate it,
          *   and hence could have different behavior (TODO: example needed))
          * - the address mode of the INDIR operand is "de-referenceable"
@@ -517,7 +490,7 @@ static int needtmp(Node p) {
                     p->x.name      = left->x.result->x.name;
                     p->x.adrmode   = dereference(left->x.adrmode);
                     return 0;
-                }   
+                }
             }
             return 1;
         case ASGN:
@@ -526,7 +499,7 @@ static int needtmp(Node p) {
         case RET:
         case JUMP: case LABEL:
             return 0;
-        case CALL: 
+        case CALL:
             if (optype(p->op)==B) return 0;
             if (p->count==0) p->op=CALLV;
             if (optype(p->op)==V) return 0;
@@ -537,7 +510,6 @@ static int needtmp(Node p) {
 }
 
 static void tmpalloc(Node p) {
-    int i;
     Node left = p->kids[0], right = p->kids[1];
     p->x.optimized=0;
     p->x.name="*******";
@@ -558,7 +530,7 @@ static void tmpalloc(Node p) {
         if (optimizelevel>=3) {
         /* these conditions must be true to optimize (=get rid of) an ASGN node:
          * - it gets its value (right child node) from a temporary variable,
-         * - the ASGN node comes just after its right child node 
+         * - the ASGN node comes just after its right child node
          *   (TODO: could it be more general? => re-ordering ?)
          * - the left value is de-referenceable,
          * - and the temporary variable is not used afterwards,
@@ -598,7 +570,7 @@ Node gen(Node p) {
 void asmcode(char *str, Symbol argv[]) {
     for ( ; *str; str++)
         if (*str == '%' && str[1] >= 0 && str[1] <= 9)
-            print("%s", argv[*++str]->x.name);
+            print("%s", argv[(int)*++str]->x.name);
         else
             print("%c", *str);
     print("\n");
@@ -615,17 +587,17 @@ static char simple_adrmode(char adrmode) {
     if (adrmode=='Z') return 'D';
     else if (adrmode=='R') return 'C';
     else if (adrmode=='I') return 'Y';
-    else return adrmode; 
+    else return adrmode;
 }
 static char reduced_adrmode(char adrmode) {
     if (adrmode=='R') return 'C';
     else if (adrmode=='I') return 'Y';
-    else return adrmode; 
+    else return adrmode;
 }
 static char *output_name(Symbol s) {
     return s->x.adrmode=='I' ? stringf("(%s),0",s->x.name) : s->x.name;
 }
-static char *output_arg(Node n) { 
+static char *output_arg(Node n) {
     if (optimizelevel==0) return n->x.name;
     return n->x.adrmode=='I' ? stringf("(%s),0",n->x.name) : n->x.name;
 }
@@ -633,15 +605,15 @@ static char *output_arg(Node n) {
 static void binary(char *inst) {
     if (optimizelevel==0)
         print("\t%s(%s,%s,%s)\n"
-            ,inst 
+            ,inst
             ,output_arg(a)
             ,output_arg(b)
             ,output_arg(r));
     else
         print("\t%s_%c%c%c(%s,%s,%s)\n"
-            ,inst 
-            ,simple_adrmode(a->x.adrmode) 
-            ,simple_adrmode(b->x.adrmode) 
+            ,inst
+            ,simple_adrmode(a->x.adrmode)
+            ,simple_adrmode(b->x.adrmode)
             ,simple_adrmode(r->x.adrmode)
             ,output_arg(a)
             ,output_arg(b)
@@ -664,7 +636,7 @@ static void unary(char *inst) {
 }
 
 static void compare0(char *inst) {
-    print("\t%s_%c(%s,%s)\n" 
+    print("\t%s_%c(%s,%s)\n"
             ,inst
             ,simple_adrmode(a->x.adrmode)
             ,output_arg(a)
@@ -690,7 +662,7 @@ static void compare(char *inst) {
 
 static void save_busy(Node p) {
     int i, offset=p->x.argoffset;
-    for (int i=0; i<8; i++) {
+    for (i=0; i<8; i++) {
         if (p->x.busy & (1<<i)) {
             // save on stack and increase the argsize
             print("\tSAVE(tmp%d,(sp),%d)\n", i, offset);
@@ -703,7 +675,7 @@ static void save_busy(Node p) {
 
 static void restore_busy(Node p) {
     int i, offset=p->x.argoffset;
-    for (int i=7; i>=0; i--) { // reverse order
+    for (i=7; i>=0; i--) { // reverse order
         if (p->x.busy & (1<<i)) {
             offset -= 2;
             print("\tRESTORE((sp),%d,tmp%d)\n", offset, i);
@@ -783,7 +755,7 @@ static void emitdag0(Node p) {
                         ,output_arg(p)); break;
         case CNSTC: print("\tCNSTC(%s,%s)\n" ,output_name(p->syms[0]) ,output_arg(p)); break;
         case CNSTS: print("\tCNSTS(%s,%s)\n" ,output_name(p->syms[0]) ,output_arg(p)); break;
-        case CNSTI: print("\tCNSTI(%s,%s)\n" ,output_name(p->syms[0]) ,output_arg(p)); break; 
+        case CNSTI: print("\tCNSTI(%s,%s)\n" ,output_name(p->syms[0]) ,output_arg(p)); break;
         case CNSTU: print("\tCNSTU(%s,%s)\n" ,output_name(p->syms[0]) ,output_arg(p)); break;
         case CNSTP: print("\tCNSTP(%s,%s)\n" ,output_name(p->syms[0]) ,output_arg(p)); break;
         case JUMPV: print("\tJUMPV(%s)\n" , output_arg(a)); break;
@@ -793,9 +765,9 @@ static void emitdag0(Node p) {
                     ,output_name(p->syms[0])); break;
         case ASGNC: print("\tASGNC(%s,%s)\n" ,output_arg(b) ,output_arg(a)); break;
         case ASGNS: print("\tASGNS(%s,%s)\n" ,output_arg(b) ,output_arg(a)); break;
-        case ASGND: print("\tASGND(%s,%s)\n" ,output_arg(b) ,output_arg(a)); break; 
+        case ASGND: print("\tASGND(%s,%s)\n" ,output_arg(b) ,output_arg(a)); break;
         case ASGNF: print("\tASGNF(%s,%s)\n" ,output_arg(b) ,output_arg(a)); break;
-        case ASGNI: print("\tASGNI(%s,%s)\n" ,output_arg(b) ,output_arg(a)); break; 
+        case ASGNI: print("\tASGNI(%s,%s)\n" ,output_arg(b) ,output_arg(a)); break;
         case ASGNP: print("\tASGNP(%s,%s)\n" ,output_arg(b) ,output_arg(a)); break;
         case ARGB:  print("\tARGB(%s,(sp),%d,%s)\n"
                     ,output_arg(a)
@@ -847,23 +819,23 @@ static void emitdag0(Node p) {
         case EQD:     compare("EQD" ); break;
         case EQF:     compare("EQF" ); break;
         case EQI:     compare("EQI" ); break;
-        case GED:     compare("GED" ); break;   
+        case GED:     compare("GED" ); break;
         case GEF:     compare("GEF" ); break;
         case GEI:     compare("GEI" ); break;
         case GEU:     compare("GEU" ); break;
-        case GTD:     compare("GTD" ); break;   
+        case GTD:     compare("GTD" ); break;
         case GTF:     compare("GTF" ); break;
         case GTI:     compare("GTI" ); break;
         case GTU:     compare("GTU" ); break;
-        case LED:     compare("LED" ); break;  
+        case LED:     compare("LED" ); break;
         case LEF:     compare("LEF" ); break;
         case LEI:     compare("LEI" ); break;
         case LEU:     compare("LEU" ); break;
-        case LTD:     compare("LTD" ); break;  
+        case LTD:     compare("LTD" ); break;
         case LTF:     compare("LTF" ); break;
         case LTI:     compare("LTI" ); break;
         case LTU:     compare("LTU" ); break;
-        case NED:     compare("NED" ); break;  
+        case NED:     compare("NED" ); break;
         case NEF:     compare("NEF" ); break;
         case NEI:     compare("NEI" ); break;
         case LABELV: print("%s\n", p->syms[0]->x.name); break;
@@ -882,7 +854,7 @@ static void emitdag(Node p) {
         case ADDD:  case ADDF:            binary("ADDF");   break;
         case ADDI:  case ADDP:  case ADDU:
             if (optimizelevel>=2
-                    && strcmp(a->x.name,p->x.name)==0 
+                    && strcmp(a->x.name,p->x.name)==0
                     && strcmp(b->x.name,"1")==0
                     && (p->x.adrmode=='Z' || p->x.adrmode=='D'))
                 print("\tINCW_%c(%s)\n" ,simple_adrmode(p->x.adrmode) ,output_arg(p));

@@ -5,8 +5,8 @@
 
 
 static struct arena first[] = {
-	0, 0, 0, &first[0], 0,
-	0, 0, 0, &first[1], 0,
+	{0, 0, 0, &first[0], 0},
+	{0, 0, 0, &first[1], 0},
 };
 Arena permanent = &first[0];	/* permanent storage */
 Arena transient = &first[1];	/* transient storage; released at function end */
@@ -20,7 +20,8 @@ char *allocate(int n, Arena *p) {
 		if (ap->next) {		/* move to next arena */
 			ap = ap->next;
 			ap->avail = (char *)ap + roundup(sizeof *ap, sizeof (double));
-		} else if (ap->next = freearenas) {
+		} else if (freearenas) {
+		    ap->next = freearenas;
 			freearenas = freearenas->next;
 			ap = ap->next;
 			ap->avail = (char *)ap + roundup(sizeof *ap, sizeof (double));
@@ -184,7 +185,7 @@ Tree root(p) Tree p; {
 			/* de-construct e++ construction */
 			return p->kids[0]->kids[1];
 		/* fall thru */
-	case EQ:  case NE:  case GT:   case GE:  case LE:  case LT: 
+	case EQ:  case NE:  case GT:   case GE:  case LE:  case LT:
 	case ADD: case SUB: case MUL:  case DIV: case MOD:
 	case LSH: case RSH: case BAND: case BOR: case BXOR:
 		p = tree(RIGHT, p->type, root(p->kids[0]), root(p->kids[1]));

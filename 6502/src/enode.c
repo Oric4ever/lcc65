@@ -62,13 +62,14 @@ Tree asgnnode(int op, Tree l, Tree r) {
 	aty = l->type;
 	if (isptr(aty))
 		aty = unqual(aty)->type;
-	if (isconst(aty) || (isstruct(aty) && unqual(aty)->u.sym->u.s.cfields))
+	if (isconst(aty) || (isstruct(aty) && unqual(aty)->u.sym->u.s.cfields)) {
 		if (isaddrop(l->op) && !l->u.sym->computed && !l->u.sym->generated)
 			error("assignment to const identifier `%s'\n", l->u.sym->name);
 		else
 			error("assignment to const location\n");
+    }
 	r = cast(r, ty);
-	if (l->op == FIELD && fieldsize(l->u.field) < 8*l->u.field->type->size)
+	if (l->op == FIELD && fieldsize(l->u.field) < 8*l->u.field->type->size) {
 		if (isunsigned(l->u.field->type))
 			r = bitnode(BAND, r,
 				constnode(fieldmask(l->u.field), unsignedtype));
@@ -89,6 +90,7 @@ Tree asgnnode(int op, Tree l, Tree r) {
 				r = shnode(LSH, r, constnode(n, inttype));
 			r = shnode(RSH, r, constnode(n, inttype));
 		}
+	}
 	if (isstruct(ty)) {
 		if (r->op == RIGHT && r->kids[0] && r->kids[0]->op == CALL+B
 		&& isaddrop(l->op)) {
@@ -200,13 +202,13 @@ Tree condnode(Tree e, Tree l, Tree r) {
 	Symbol t1 = 0;
 	Type ty = 0, lty = l->type, rty = r->type;
 	Tree p;
-	
+
 	if (isarith(lty) && isarith(rty)) {
 		ty = binary(lty, rty);
 		l = cast(l, ty);
 		r = cast(r, ty);
 	} else if (eqtype(lty, rty, 1)
-	|| isptr(lty) && isint(rty) && assign(lty, r))
+	|| (isptr(lty) && isint(rty) && assign(lty, r)))
 		ty = unqual(lty);
 	else if (isptr(rty) && isint(lty) && assign(rty, l))
 		ty = unqual(rty);
@@ -277,10 +279,8 @@ Tree eqnode(int op, Tree l, Tree r) {
 				op == EQ ? "==" : "!=");
 		return simplify(op + U, inttype, l, r);
 	}
-	if (isptr(l->type) && !isfunc(l->type->type)
-	&& (r->type == voidptype || unqual(r->type->type) == voidtype)
-	||  isptr(r->type) && !isfunc(r->type->type)
-	&& (l->type == voidptype || unqual(l->type->type) == voidtype)) {
+	if ((isptr(l->type) && !isfunc(l->type->type) && (r->type == voidptype || unqual(r->type->type) == voidtype))
+	||  (isptr(r->type) && !isfunc(r->type->type) && (l->type == voidptype || unqual(l->type->type) == voidtype))) {
 		l = cast(l, unsignedtype);
 		r = cast(r, unsignedtype);
 		return simplify(op + U, inttype, l, r);
@@ -346,15 +346,31 @@ static Tree subnode(int op, Tree l, Tree r) {
 void typeerror(int op, Tree l, Tree r) {
 	int i;
 	static struct { Opcode op; char *name; } ops[] = {
-		ASGN, "=",	INDIR, "*",	NEG,  "-",
-		ADD,  "+",	SUB,   "-",	LSH,  "<<",
-		MOD,  "%",	RSH,   ">>",	BAND, "&",
-		BCOM, "~",	BOR,   "|",	BXOR, "^",
-		DIV,  "/",	MUL,   "*",	EQ,   "==",
-		GE,   ">=",	GT,    ">",	LE,   "<=",
-		LT,   "<",	NE,    "!=",	AND,  "&&",
-		NOT,  "!",	OR,    "||",	COND, "?:",
-		0, 0
+		{ ASGN,  "="},
+		{ INDIR, "*"},
+		{ NEG,   "-"},
+		{ ADD,   "+"},
+		{ SUB,   "-"},
+		{ LSH,  "<<"},
+		{ MOD,   "%"},
+		{ RSH,  ">>"},
+		{ BAND,  "&"},
+		{ BCOM,  "~"},
+		{ BOR,   "|"},
+		{ BXOR,  "^"},
+		{ DIV,   "/"},
+		{ MUL,   "*"},
+		{ EQ,   "=="},
+		{ GE,   ">="},
+		{ GT,    ">"},
+		{ LE,   "<="},
+		{ LT,    "<"},
+		{ NE,   "!="},
+		{ AND,  "&&"},
+		{ NOT,   "!"},
+		{ OR,   "||"},
+		{ COND, "?:"},
+		{ 0, 0}
 	};
 
 	op = generic(op);

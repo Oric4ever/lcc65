@@ -167,7 +167,7 @@ static Tree call(f, fty, src) Tree f; Type fty; Coordinate src; {
 				}
 				q = tree(RIGHT, ptr(q->type), root(q), lvalue(idnode(t1)));
 			}
-				
+
 #endif
 			if (hascall(q))
 				r = tree(RIGHT, voidtype, r, q);
@@ -410,7 +410,7 @@ static Tree expr3(int k) {
 				r = right(e, pointer(expr3(k1 + (k1>5))));
 			} else
 				r = pointer(expr3(k1 + (k1>5)));
-			p = (*opnode[op])(oper[op], p, r); 
+			p = (*opnode[op])(oper[op], p, r);
 		}
 	return p;
 }
@@ -659,7 +659,7 @@ static Tree prefix() {
 		if (isarith(p->type))
 			p = cast(p, promote(p->type));
 		else
-			typeerror(ADD, p, 0); 
+			typeerror(ADD, p, 0);
 		break;
 	case '-':
 		t = gettok();
@@ -681,7 +681,7 @@ static Tree prefix() {
 			Type ty = promote(p->type);
 			p = simplify(BCOM, ty, cast(p, ty), 0);
 		} else
-			typeerror(BCOM, p, 0); 
+			typeerror(BCOM, p, 0);
 		break;
 	case '!':
 		t = gettok();
@@ -689,7 +689,7 @@ static Tree prefix() {
 		if (isscalar(p->type))
 			p = simplify(NOT, inttype, cond(p), 0);
 		else
-			typeerror(NOT, p, 0); 
+			typeerror(NOT, p, 0);
 		break;
 	case INCR: case DECR: {
 		Opcode op = t;
@@ -836,7 +836,7 @@ static Tree primary() {
 		break;
 	case SCON:
 		tsym->u.c.v.p = stringn(tsym->u.c.v.p, tsym->type->size);
-		tsym = constant(tsym->type, tsym->u.c.v); 
+		tsym = constant(tsym->type, tsym->u.c.v);
 		if (tsym->u.c.loc == 0)
 			tsym->u.c.loc = genident(STATIC, tsym->type, GLOBAL);
 		p = idnode(tsym->u.c.loc);

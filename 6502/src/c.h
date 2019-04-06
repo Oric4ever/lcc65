@@ -13,6 +13,7 @@
 #endif
 
 #include "ops.h"
+#include <assert.h>
 
 #ifdef __STDC__
 #include <stdarg.h>
@@ -111,7 +112,8 @@ dclproto(extern void blockend,(Env *));
 #endif
 
 /* limits */
-#ifdef __LCC__
+#if 1
+//#ifdef __LCC__
 #include <limits.h>
 #include <float.h>
 #else
@@ -221,9 +223,8 @@ enum { CONSTANTS=1, LABELS, GLOBAL, PARAM, LOCAL };
 #define utod(x)	(2.*(int)((unsigned)(x)>>1)+(int)((x)&1))
 #ifdef NDEBUG
 #define assert(c)
-#else
-#define assert(c) ((c) || fatal(__FILE__,"assertion failure at line %d\n",\
-	__LINE__))
+//#else
+//#define assert(c) ((c) || fatal(__FILE__,"assertion failure at line %d\n",__LINE__))
 #endif
 
 /* C library */
@@ -555,7 +556,7 @@ dclproto(extern void deallocate,(Arena *));
 /*G*/extern Arena transient;
 dclproto(extern List append,(Generic, List));
 dclproto(extern int length,(List));
-dclproto(extern Generic *ltoa,(List, Generic []));
+dclproto(extern Generic *list_to_a,(List, Generic []));
 /*G*/dclproto(extern char *string,(char *));
 /*G*/dclproto(extern char *stringd,(int));
 dclproto(extern char *stringn,(char *, int));

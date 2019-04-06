@@ -4,11 +4,7 @@
 #include "c.h"
 #include <string.h>
 #include <fcntl.h>
-#ifdef __unix__
 #include <unistd.h>
-#elif defined(_WIN32) || defined(_WIN64)
-#include <io.h>
-#endif
 
 extern void exit(int);
 extern double strtod(const char *, char **);
@@ -75,9 +71,9 @@ int main(int argc, char *argv[]) {
 		src.x = 0;
 		src.y = lineno;
 		if (glevel > 2 || xref)
-			stabend(&src, symroot, (Coordinate **)ltoa(append((Generic)0, loci), 0),
-				(Symbol *)ltoa(append((Generic)0, tables), 0),
-				symbols ? (Symbol *)ltoa(symbols, 0) : 0);
+			stabend(&src, symroot, (Coordinate **)list_to_a(append((Generic)0, loci), 0),
+				(Symbol *)list_to_a(append((Generic)0, tables), 0),
+				symbols ? (Symbol *)list_to_a(symbols, 0) : 0);
 		else
 			stabend(&src, 0, 0, 0, 0);
 	}
@@ -187,7 +183,7 @@ static Type ftype(rty, ty) Type rty, ty; {
 	List list = append(ty, 0);
 
 	list = append(voidtype, list);
-	return func(rty, (Type *)ltoa(list, (Generic *)alloc((length(list) + 1)*sizeof (Type))));
+	return func(rty, (Type *)list_to_a(list, (Generic *)alloc((length(list) + 1)*sizeof (Type))));
 }
 
 /* mkstr - make a string constant */
@@ -290,7 +286,7 @@ static void bbcall(yycounts, cp, e) Symbol yycounts; Coordinate *cp; Tree *e; {
 /* bbentry - return tree for `_prologue(&afunc, &YYlink)' */
 static void bbentry(yylink, f) Symbol yylink, f; {
 	static Symbol p;
-	
+
 	afunc = genident(STATIC, array(voidptype, 4, 0), GLOBAL);
 	if (p == 0)
 		p = mksymbol(EXTERN, "_prologue", ftype(inttype, voidptype));
@@ -302,7 +298,7 @@ static void bbentry(yylink, f) Symbol yylink, f; {
 /* bbexit - return tree for `_epilogue(&afunc)' */
 static void bbexit(yylink, f, e) Symbol yylink, f; Tree e; {
 	static Symbol p;
-	
+
 	if (p == 0)
 		p = mksymbol(EXTERN, "_epilogue", ftype(inttype, voidptype));
 	walk(callnode(pointer(idnode(p)), freturn(p->type),
@@ -314,7 +310,8 @@ static int bbfile(file) char *file; {
 	if (file) {
 		List lp;
 		int i = 1;
-		if (lp = filelist)
+		lp = filelist;
+		if (lp)
 			do {
 				lp = lp->link;
 				if (((Symbol)lp->x)->u.c.v.p == file)
@@ -398,12 +395,12 @@ static void bbvars(yylink) Symbol yylink; {
 	}
 	files = genident(STATIC, array(ptr(chartype), 1, 0), GLOBAL);
 	defglobal(files, LIT);
-	for (p = (Symbol *)ltoa(filelist, 0); *p; p++)
+	for (p = (Symbol *)list_to_a(filelist, 0); *p; p++)
 		defpointer((*p)->u.c.loc);
 	defpointer(0);
 	coords = genident(STATIC, array(unsignedtype, n, 0), GLOBAL);
 	defglobal(coords, LIT);
-	for (i = n, mp = (struct map **)ltoa(maplist, 0); *mp; i -= (*mp)->size, mp++)
+	for (i = n, mp = (struct map **)list_to_a(maplist, 0); *mp; i -= (*mp)->size, mp++)
 		for (j = 0; j < (*mp)->size; j++)
 			defconst(U, (v.u = (*mp)->u[j].coord, v));
 	if (i > 0)
@@ -430,8 +427,8 @@ dclproto(static void tracevalue,(Tree, int));
 
 /* appendstr - append str to the evolving format string, expanding it if necessary */
 static void appendstr(str) char *str; {
-	do
-		if (fp == fmtend)
+	do {
+		if (fp == fmtend) {
 			if (fp) {
 				char *s = (char *)talloc(2*(fmtend - fmt));
 				strncpy(s, fmt, fmtend - fmt);
@@ -442,7 +439,9 @@ static void appendstr(str) char *str; {
 				fp = fmt = (char *)talloc(80);
 				fmtend = fmt + 80;
 			}
-	while (*fp++ = *str++);
+		}
+		*fp++ = *str;
+	} while (*str++);
 	fp--;
 }
 

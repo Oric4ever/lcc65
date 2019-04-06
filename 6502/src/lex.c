@@ -304,9 +304,9 @@ static char *asmargs(p, argv, size) Symbol p, argv[]; int size; {
 		return "";
 	}
 	for (s2 = str, s1 = p->u.c.v.p; *s1; )
-		if ((*s2++ = *s1++) == '%' && *s1 && map[*s1]&LETTER) {
+		if ((*s2++ = *s1++) == '%' && *s1 && map[(int)*s1]&LETTER) {
 			char *t = s1;
-			while (*t && map[*t]&(LETTER|DIGIT))
+			while (*t && map[(int)*t]&(LETTER|DIGIT))
 				t++;
 			if ((argv[n] = lookup(stringn(s1, t - s1), identifiers))
 			&& argv[n]->sclass != TYPEDEF && argv[n]->sclass != ENUM) {
@@ -732,7 +732,7 @@ int gettok() {
 			return '-';
 		case ';': case ',': case ':':
 		case '*': case '~': case '%': case '^': case '?':
-		case '[': case ']': case '{': case '}': case '(': case ')': 
+		case '[': case ']': case '{': case '}': case '(': case ')':
 			cp = rcp;
 			return *(rcp-1);
 #include "keywords.h"
@@ -778,8 +778,8 @@ static Symbol icon(unsigned n, int overflow) {
 	if (*cp == 'u' || *cp == 'U')
 		u = *cp++;
 	if (*cp == 'l' || *cp == 'L')
-		*cp++;
-	if (u == 0 && *cp == 'u' || *cp == 'U')
+		cp++;
+	if ((u == 0 && *cp == 'u') || *cp == 'U')
 		u = *cp++;
 	if (overflow) {
 		char c = *cp;

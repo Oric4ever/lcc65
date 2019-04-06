@@ -60,10 +60,8 @@ static struct dag *dagnode(int op, Node l, Node r, Symbol sym)
 
 	BZERO(p, struct dag);
 	p->node.op = op;
-	if (p->node.kids[0] = l)
-		++l->count;
-	if (p->node.kids[1] = r)
-		++r->count;
+	p->node.kids[0] = l; if (l) l->count++;
+	p->node.kids[1] = r; if (r) r->count++;
 	p->node.syms[0] = sym;
 	return p;
 }
@@ -125,7 +123,7 @@ void emitcode() {
 				defaddress(cp->u.swtch.labels[i]->u.l.equatedto);
 			}
 			break;
-			}
+		}
 		}
 	src = save;
 }
@@ -173,7 +171,7 @@ void gencode(Symbol caller[], Symbol callee[]) {
 		switch (cp->kind) {
 		case Start: case Asm: case Switch:
 			break;
-		case Defpoint: 
+		case Defpoint:
 			src = cp->u.point.src;
 			break;
 		case Blockbeg: {
@@ -221,7 +219,7 @@ static int haskid(Node p, Node t) {
 	else if (p == t)
 		return 1;
 	else
-		return haskid(p, t->kids[0]) || haskid(p, t->kids[1]); 
+		return haskid(p, t->kids[0]) || haskid(p, t->kids[1]);
 }
 
 /* labelnode - list and return a LABEL node for label lab */
@@ -293,7 +291,8 @@ Node listnodes(Tree tp, int tlab, int flab) {
 		trash(0);
 		listnodes(tp->kids[0], 0, flab = genlabel(2));
 		trash(0);
-		if (q = tp->kids[1]) {
+		q = tp->kids[1];
+		if (q) {
 			assert(q->op == RIGHT);
 			listnodes(q->kids[0], 0, 0);
 			if (islabel(nodelist)) {
@@ -437,11 +436,11 @@ Node listnodes(Tree tp, int tlab, int flab) {
 				unsigned int fmask = fieldmask(p);
 				unsigned int mask = fmask<<fieldright(p);
 				Tree q = tp->kids[1];
-				if (q->op == CNST+I && q->u.v.i == 0
-				||  q->op == CNST+U && q->u.v.u == 0)
+				if ((q->op == CNST+I && q->u.v.i == 0)
+				||  (q->op == CNST+U && q->u.v.u == 0))
 					q = bitnode(BAND, x, constnode(~mask, unsignedtype));
-				else if (q->op == CNST+I && (q->u.v.i&fmask) == fmask
-				||       q->op == CNST+U && (q->u.v.u&fmask) == fmask)
+				else if ((q->op == CNST+I && (q->u.v.i&fmask) == fmask)
+				||       (q->op == CNST+U && (q->u.v.u&fmask) == fmask))
 					q = bitnode(BOR, x, constnode(mask, unsignedtype));
 				else
 					q = bitnode(BOR,
@@ -587,7 +586,8 @@ dclproto(static void printnode,(Node, int, int));
 void printdag(Node p, int fd) {
 	printed(0);
 	if (p == 0) {
-		if (p = nodelist)
+		p = nodelist;
+		if (p)
 			do {
 				p = p->link;
 				printdag1(p, fd, 0);
@@ -650,13 +650,15 @@ static void trash(Node p) {
 		register int i;
 		register struct dag *q, **r;
 		for (i = 0; i < NBUCKETS; i++)
-			for (r = &buckets[i]; q = *r; )
-				if (generic(q->node.op) == INDIR && (!isaddrop(q->node.kids[0]->op)
-				|| q->node.kids[0]->syms[0] == p->syms[0])) {
+			for (r = &buckets[i]; *r; ) {
+                q = *r;
+				if (generic(q->node.op) == INDIR
+                    && (!isaddrop(q->node.kids[0]->op) || q->node.kids[0]->syms[0] == p->syms[0])) {
 					*r = q->hlink;
 					--nodecount;
 				} else
 					r = &q->hlink;
+			}
 	} else if (nodecount > 0)
 		reset();
 }
@@ -713,7 +715,7 @@ static Node undag(Node nodelist) {
 			 * re-insert p into the node list
 			 * immediately before its predecessor;
 			 * this places the CALL node before the ASGN node.
-			 */ 
+			 */
 			for (q = &head; q && q->link != pred; q = q->link)
 				;
 			assert(q);
@@ -762,7 +764,7 @@ static Node undag1(Node p, Node root) {
 	} else if (generic(p->op) == INDIR
 	&& (p->kids[0]->op == ADDRL+P || p->kids[0]->op == ADDRF+P)
 	&& p->kids[0]->syms[0]->sclass == REGISTER && p != root) {
-		p = newnode(p->op, 
+		p = newnode(p->op,
 			newnode(p->kids[0]->op, 0, 0, p->kids[0]->syms[0]), 0, 0);
 		p->count = 1;
 	} else if (p->op == INDIR+B) {

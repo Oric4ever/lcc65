@@ -7,8 +7,8 @@ char *fname=0;          /* function name */
 Symbol retv;			/* return value location for structs */
 
 static List autos;		/* auto locals for current block */
-static int funcdclr;		/* declarator has parameters */	
-static int nglobals;		/* number of external ids */	
+static int funcdclr;		/* declarator has parameters */
+static int nglobals;		/* number of external ids */
 static int regcount;		/* number of explicit register declarations */
 static List registers;		/* register locals for current block */
 
@@ -59,11 +59,12 @@ static void checkref(p, cl) Symbol p; Generic cl; {
 		p->sclass = REGISTER;
 	if (p->scope > PARAM && (q = lookup(p->name, externals))) {
 		q->ref += p->ref;
-	} else if (p->sclass == STATIC && !p->defined)
+	} else if (p->sclass == STATIC && !p->defined) {
 		if (p->ref > 0)
 			error("undefined static `%t %s'\n", p->type, p->name);
 		else if (isfunc(p->type))
 			warning("undefined static `%t %s'\n", p->type, p->name);
+	}
 }
 
 /* compound - { ( decl ; )* statement* } */
@@ -88,11 +89,11 @@ void compound(int loop, struct swtch *swp, int lev) {
 		apply(events.entry, (Generic)cfunc, (Generic)0);
 	expect('{');
 	while (kind[t] == CHAR || kind[t] == STATIC
-	|| t == ID && tsym && tsym->sclass == TYPEDEF && (level < LOCAL || getchr() != ':'))
+	|| (t == ID && tsym && tsym->sclass == TYPEDEF && (level < LOCAL || getchr() != ':')))
 		decl(dcllocal, 0);
 	nregs = length(registers);
-	cp->u.block.locals = (Symbol *)ltoa(registers, (Generic *)talloc((nregs + length(autos) + 1)*sizeof(Symbol)));
-	ltoa(autos, (Generic *)&cp->u.block.locals[nregs]);
+	cp->u.block.locals = (Symbol *)list_to_a(registers, (Generic *)talloc((nregs + length(autos) + 1)*sizeof(Symbol)));
+	list_to_a(autos, (Generic *)&cp->u.block.locals[nregs]);
 	while (kind[t] == IF || kind[t] == ID)
 		statement(loop, swp, lev);
 	walk(0, 0, 0);
@@ -401,7 +402,7 @@ static Type dclr1(char **id, int lev) {
 
 /* decl - type [ dclr ( , dclr )* ] ; */
 static void decl(dcl, eflag)
-dclproto(Symbol (*dcl),(int, char *, Type, Coordinate *)); 
+dclproto(Symbol (*dcl),(int, char *, Type, Coordinate *));
 int eflag;
 {
 	int sclass;
@@ -563,7 +564,7 @@ static Type enumdecl() {
 			ty->type = inttype;
 		ty->size = ty->type->size;
 		ty->align = ty->type->align;
-		ty->u.sym->u.idlist = (Symbol *)ltoa(idlist, (Generic *)alloc((length(idlist) + 1)*sizeof(Symbol)));
+		ty->u.sym->u.idlist = (Symbol *)list_to_a(idlist, (Generic *)alloc((length(idlist) + 1)*sizeof(Symbol)));
 		ty->u.sym->defined = 1;
 	} else if ((p = lookup(tag, types)) && p->type->op == ENUM) {
 		if (*tag && xref)
@@ -691,7 +692,7 @@ static void fields(Type ty) {
 	}
 	checkfields(ty);
 }
-	
+
 /* finalize - finalize tentative definitions, constants, check unref'd statics */
 void finalize() {
 	if (xref) {
@@ -725,7 +726,7 @@ static void funcdecl(int sclass, char *id, Type ty, Coordinate pt) {
 	n = length(callees);
 	if (Aflag >= 2 && n > 31)
 		warning("more than 31 parameters in function `%s'\n", id);
-	caller = (Symbol *)ltoa(callees, (Generic *)0);
+	caller = (Symbol *)list_to_a(callees, (Generic *)0);
 	callee = (Symbol *)talloc((n + 1)*sizeof *caller);
 	for (i = 0; p = caller[i]; i++) {
 		callee[--n] = p;
@@ -884,7 +885,7 @@ static Type oldstyle(char *name, Type ty, Symbol caller[], Symbol callee[]) {
 			error("conflicting argument declarations for function `%s'\n", name);
 		ty = func(freturn(ty), p->type->u.proto);
 	} else
-		ty = func(freturn(ty), 0); 
+		ty = func(freturn(ty), 0);
 	return ty;
 }
 /* parameters - [id ( , id )* | type dclr ( , type dclr )*] */
@@ -929,7 +930,7 @@ static Type *parameters(int lev) {
 				break;
 			t = gettok();
 		}
-		proto = (Type *)ltoa(list, (Generic *)alloc((n + 1)*sizeof (Type)));
+		proto = (Type *)list_to_a(list, (Generic *)alloc((n + 1)*sizeof (Type)));
 	} else if (t == ID) {
 		for (;;) {
 			if (t != ID) {
@@ -960,7 +961,7 @@ static void checkparam(Symbol p, Generic cl) {
 /* program - decl* */
 void program() {
 	int n;
-	
+
 	level = GLOBAL;
 	for (n= 0; t != EOI; n++)
 		if (kind[t] == CHAR || kind[t] == STATIC || t == ID)
@@ -1062,7 +1063,7 @@ static Type type(int lev, int *sclass) {
 			break;
 		case ENUM:
 			ty = enumdecl();
-			break; 
+			break;
 		case STRUCT: case UNION:
 			ty = structdcl(t);
 			break;

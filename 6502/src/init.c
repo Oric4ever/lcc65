@@ -163,7 +163,7 @@ static int initarray(len, ty, lev) int len,lev; Type ty; {
 	do {
 		initializer(ty, lev);
 		n += ty->size;
-		if (len > 0 && n >= len || t != ',')
+		if ((len > 0 && n >= len) || t != ',')
 			break;
 		t = gettok();
 	} while (t != '}');
@@ -179,7 +179,8 @@ static int initchar(int len, Type ty) {
 		if (current) {
 			Type aty;
 			Tree e = expr1(0);
-			if (aty = assign(ty, e))
+			aty = assign(ty, e);
+			if (aty)
 				genasgn(cast(e, aty), current);
 			else
 				error("invalid initialization type; found `%t' expected `%s'\n",
@@ -192,7 +193,7 @@ static int initchar(int len, Type ty) {
 				s = buf;
 			}
 		}
-		if (len > 0 && n >= len || t != ',')
+		if ((len > 0 && n >= len) || t != ',')
 			break;
 		t = gettok();
 	} while (t != '}');
@@ -246,9 +247,9 @@ static int initfields(p, q) Field p, q; {
 	do {
 		i = initvalue(inttype)->u.v.i;
 		if (fieldsize(p) < 8*p->type->size) {
-			if (p->type == inttype && i >= 0 && (i&~(fieldmask(p)>>1)) !=  0
-			||  p->type == inttype && i <  0 && (i| (fieldmask(p)>>1)) != ~0
-			||  p->type == unsignedtype      && (i& ~fieldmask(p)))
+			if ((p->type == inttype && i >= 0 && (i&~(fieldmask(p)>>1)) !=  0)
+			||  (p->type == inttype && i <  0 && (i| (fieldmask(p)>>1)) != ~0)
+			||  (p->type == unsignedtype      && (i& ~fieldmask(p))))
 				warning("initializer exceeds bit-field width\n");
 			i &= fieldmask(p);
 		}
@@ -316,7 +317,8 @@ Type initializer(Type ty, int lev) {
 		} else
 			e = expr1(0);
 		e = pointer(e);
-		if (aty = assign(ty, e))
+		aty = assign(ty, e);
+		if (aty)
 			e = cast(e, aty);
 		else
 			error("invalid initialization type; found `%t' expected `%t'\n",
@@ -402,7 +404,7 @@ Type initializer(Type ty, int lev) {
 			error("missing { in initialization of `%t'\n", ty);
 			n = initarray(aty->size, aty, lev + 1);
 		}
-	}	
+	}
 	if (ty->size) {
 		if (n > ty->size)
 			error("too many initializers\n");
@@ -444,7 +446,7 @@ static int initstruct(int len, Type ty, int lev) {
 			genspace(a - n%a, current);
 			n = roundup(n, a);
 		}
-		if (len > 0 && n >= len || t != ',')
+		if ((len > 0 && n >= len) || t != ',')
 			break;
 		t = gettok();
 	} while (t != '}');
@@ -458,7 +460,8 @@ static Tree initvalue(ty) Type ty; {
 
 	needconst++;
 	e = expr1(0);
-	if (aty = assign(ty, e))
+	aty = assign(ty, e);
+	if (aty)
 		e = cast(e, aty);
 	else {
 		error("invalid initialization type; found `%t' expected `%s'\n",

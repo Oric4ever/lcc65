@@ -1,11 +1,7 @@
 /* C compiler: output functions */
 
 #include "c.h"
-#ifdef __unix__
 #include <unistd.h>
-#elif defined(_WIN32) || defined(_WIN64)
-#include <io.h>
-#endif
 
 
 static char buf1[4*1024], buf2[512];	/* output buffers */
@@ -15,9 +11,9 @@ static struct io {
 	char *buffer;			/* buffer proper */
 	char *limit;			/* high water limit */
 } iob[] = {
-	0, 0, 0, 0,
-	1, buf1, buf1, buf1 + sizeof buf1 - 80,
-	2, buf2, buf2, buf2 + sizeof buf2 - 80
+	{ 0, 0, 0, 0},
+	{1, buf1, buf1, buf1 + sizeof buf1 - 80},
+	{2, buf2, buf2, buf2 + sizeof buf2 - 80}
 }, *io[] = {
 	&iob[0],			/* used by stringf */
 	&iob[1],			/* standard output */
@@ -52,10 +48,9 @@ void outflush() {
 
 /* outs - output string s */
 void outs(s) char *s; {
-	char *p;
+	char *p = bp;
 
-	for (p = bp; *p = *s++; p++)
-		;
+	while (*s) *p++ = *s++;
 	bp = p;
 	if (bp > io[fd]->limit)
 		outflush();

@@ -1,0 +1,100 @@
+# depslib dependency file v1.0
+1554570111 source:c:\users\fabrice\desktop\lcc65-windows\dag.c
+	"c.h"
+
+1554563710 c:\users\fabrice\desktop\lcc65-windows\c.h
+	"ops.h"
+	<assert.h>
+	<stdarg.h>
+	"token.h"
+	<varargs.h>
+	"token.h"
+	"config.h"
+	<limits.h>
+	<float.h>
+
+1554540967 c:\users\fabrice\desktop\lcc65-windows\ops.h
+
+1554540967 c:\users\fabrice\desktop\lcc65-windows\token.h
+
+1554540967 c:\users\fabrice\desktop\lcc65-windows\config.h
+
+1554569464 source:c:\users\fabrice\desktop\lcc65-windows\decl.c
+	"c.h"
+
+1554566697 source:c:\users\fabrice\desktop\lcc65-windows\enode.c
+	"c.h"
+	"token.h"
+
+1554540967 source:c:\users\fabrice\desktop\lcc65-windows\error.c
+	"c.h"
+
+1554563735 source:c:\users\fabrice\desktop\lcc65-windows\expr.c
+	"c.h"
+	"token.h"
+	"token.h"
+
+1554569612 source:c:\users\fabrice\desktop\lcc65-windows\gen.c
+	"c.h"
+	<string.h>
+	<stdio.h>
+	<stdbool.h>
+
+1554569175 source:c:\users\fabrice\desktop\lcc65-windows\init.c
+	"c.h"
+
+1554564304 source:c:\users\fabrice\desktop\lcc65-windows\lex.c
+	"c.h"
+	"token.h"
+	<errno.h>
+	"keywords.h"
+
+1554540967 c:\users\fabrice\desktop\lcc65-windows\keywords.h
+
+1554567100 source:c:\users\fabrice\desktop\lcc65-windows\simp.c
+	"c.h"
+	<stdio.h>
+	<assert.h>
+
+1554569175 source:c:\users\fabrice\desktop\lcc65-windows\stmt.c
+	"c.h"
+
+1554563934 source:c:\users\fabrice\desktop\lcc65-windows\string.c
+	"c.h"
+
+1554569272 source:c:\users\fabrice\desktop\lcc65-windows\sym.c
+	"c.h"
+
+1554569428 source:c:\users\fabrice\desktop\lcc65-windows\types.c
+	"c.h"
+
+1554563756 source:c:\users\fabrice\desktop\lcc65-windows\input.c
+	"c.h"
+	<string.h>
+	<unistd.h>
+
+1554566330 source:c:\users\fabrice\desktop\lcc65-windows\output.c
+	"c.h"
+	<unistd.h>
+	"token.h"
+
+1554563777 source:c:\users\fabrice\desktop\lcc65-windows\profio.c
+	<string.h>
+	<fcntl.h>
+	<unistd.h>
+	"c.h"
+
+1554566775 source:c:\users\fabrice\desktop\lcc65-windows\tree.c
+	"c.h"
+	<stdlib.h>
+	"ops.h"
+
+1554566977 source:c:\users\fabrice\desktop\lcc65-windows\main.c
+	"version.h"
+	"c.h"
+	<string.h>
+	<fcntl.h>
+	<unistd.h>
+
+1554540967 c:\users\fabrice\desktop\lcc65-windows\version.h
+

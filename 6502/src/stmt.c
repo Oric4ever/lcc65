@@ -51,7 +51,8 @@ static void branch(int lab) {
 			Symbol old = findlabel(lab);
 			equatelab(cp->u.node->syms[0], old);
 			old->ref++;
-			if (cp->prev->next = cp->next)
+			cp->prev->next = cp->next;
+			if (cp->next)
 				cp->next->prev = cp->prev;
 			else
 				codelist = cp->prev;
@@ -80,7 +81,7 @@ static void caselabel(swp, val, lab) int val,lab; struct swtch *swp; {
 			swp->values[k] = vals[k];
 			swp->labels[k] = labs[k];
 		}
-	}	
+	}
 	for (k = swp->ncases; k > 0 && swp->values[k-1] >= val; k--) {
 		swp->values[k] = swp->values[k-1];
 		swp->labels[k] = swp->labels[k-1];
@@ -169,7 +170,7 @@ void equatelab(new, old) Symbol new, old; {
 		else if (e->new == old)
 			equlist->oldlink = e;
 }
-	
+
 /* flushequ - flush deferred equates */
 void flushequ() {
 	for ( ; equlist; equlist = equlist->link)
@@ -321,7 +322,8 @@ void retcode(Tree p, int lab) {
 	} else {
 		Type ty;
 		p = pointer(p);
-		if (ty = assign(freturn(cfunc->type), p))
+		ty = assign(freturn(cfunc->type), p);
+		if (ty)
 			p = cast(p, ty);
 		else
 			error("illegal return type; found `%t' expected `%t'\n",
@@ -623,7 +625,7 @@ static void swgen(swp) struct swtch *swp; {
 		buckets[n] = k;
 		while (n > 0) {
 			float d = den(k, n-1);
-			if (d < density || k < swp->ncases - 1 && d < den(k+1, n))
+			if (d < density || (k < swp->ncases - 1 && d < den(k+1, n)))
 				break;
 			n--;
 		}

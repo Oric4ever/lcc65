@@ -2,6 +2,7 @@
 
 #include "c.h"
 #include <stdio.h>
+#include <assert.h>
 
 int needconst;		/* >=1 if parsing a constant expression */
 
@@ -13,11 +14,13 @@ dclproto(static int sub,(double, double, double, double, int));
 
 /* add - return 1 if min <= x+y <= max, 0 otherwise */
 static int add(x, y, min, max, needconst) double x, y, min, max;  int needconst; {
-	int cond = x == 0 || y == 0
-	|| x < 0 && y < 0 && x >= min - y
-	|| x < 0 && y > 0
-	|| x > 0 && y < 0
-	|| x > 0 && y > 0 && x <= max - y;
+	int cond =
+        x == 0
+    ||  y == 0
+	|| (x < 0 && y < 0 && x >= min - y)
+	|| (x < 0 && y > 0)
+	|| (x > 0 && y < 0)
+	|| (x > 0 && y > 0 && x <= max - y);
 	if (!cond && needconst) {
 		warning("overflow in constant expression\n");
 		cond = 1;
@@ -65,7 +68,6 @@ static Tree addrnode(p, n, ty) Symbol p; int n; Type ty; {
 static int div(x, y, min, max, needconst) double x, y, min, max; int needconst; {
 	int cond;
 
-	&min;
 	if (x < 0) x = -x;
 	if (y < 0) y = -y;
 	cond = y != 0 && (y > 1 || x <= max*y);
@@ -89,11 +91,13 @@ int ispow2(u) unsigned u; {
 
 /* mul - return 1 if min <= x*y <= max, 0 otherwise */
 static int mul(x, y, min, max, needconst) double x, y, min, max; int needconst; {
-	int cond = x > -1 && x <= 1 || y > -1 && y <= 1
-	|| x < 0 && y < 0 && -x <= max/-y
-	|| x < 0 && y > 0 &&  x >= min/y
-	|| x > 0 && y < 0 &&  x >= min/y
-	|| x > 0 && y > 0 &&  x <= max/y;
+	int cond =
+	   (x > -1 && x <= 1)
+    || (y > -1 && y <= 1)
+	|| (x < 0 && y < 0 && -x <= max/-y)
+	|| (x < 0 && y > 0 &&  x >= min/y)
+	|| (x > 0 && y < 0 &&  x >= min/y)
+	|| (x > 0 && y > 0 &&  x <= max/y);
 	if (!cond && needconst) {
 		warning("overflow in constant expression\n");
 		cond = 1;
@@ -201,13 +205,14 @@ Tree simplify(op, ty, l, r) int op; Type ty; Tree l, r; {
 		if (l->op == RIGHT && isstruct(l->type))	/* f().x */
 			return tree(RIGHT, ty, l->kids[0],
 				simplify(ADD+P, ty, l->kids[1], r));
-		if (l->op == RIGHT)
+		if (l->op == RIGHT) {
 			if (l->kids[1])
 				return tree(RIGHT, ty, l->kids[0],
 					simplify(ADD+P, ty, l->kids[1], r));
 			else
 				return tree(RIGHT, ty,
 					simplify(ADD+P, ty, l->kids[0], r), 0);
+		}
 		break;
 	case ADD+U:
 		foldcnst(U,u,+,unsignedtype);
@@ -286,7 +291,7 @@ Tree simplify(op, ty, l, r) int op; Type ty; Tree l, r; {
 #endif
 		xfoldcnst(I,i,/,inttype,div,INT_MIN,INT_MAX);
 		break;
-	case DIV+U:		
+	case DIV+U:
 		identity(r,l,U,u,1);
 		if (r->op == CNST+U && r->u.v.u == 0)
 			break;
@@ -372,7 +377,7 @@ Tree simplify(op, ty, l, r) int op; Type ty; Tree l, r; {
 #endif
 		xfoldcnst(I,i,%,inttype,div,INT_MIN,INT_MAX);
 		break;
-	case MOD+U:		
+	case MOD+U:
 		if (r->op == CNST+U && ispow2(r->u.v.u))	/* l%2^n => l&(2^n-1) */
 			return bitnode(BAND, l,
 				constnode(r->u.v.u - 1, unsignedtype));
