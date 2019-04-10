@@ -350,7 +350,7 @@ Type func(ty, proto) Type ty, *proto; {
 
 /* funcl - construct the type `function (list) returning ty' */
 static Type funcl(ty, list) Type ty; List list; {
-	return func(ty, (Type *)ltoa(list, (Generic *)alloc((length(list) + 1)*sizeof (Type))));
+	return func(ty, (Type *)list_to_a(list, (Generic *)alloc((length(list) + 1)*sizeof (Type))));
 }
 
 /* hasproto - true iff ty has no function types or they all have prototypes */

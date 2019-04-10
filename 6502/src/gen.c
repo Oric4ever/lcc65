@@ -23,7 +23,7 @@
  */
 
 
-char *version="/* 16-bit code V1.33 */\n";
+char *version="/* 16-bit code V1.34 */\n";
 #include "c.h"
 #include <string.h>
 #include <stdio.h>
@@ -530,6 +530,7 @@ static void tmpalloc(Node p) {
         if (optimizelevel>=3) {
         /* these conditions must be true to optimize (=get rid of) an ASGN node:
          * - it gets its value (right child node) from a temporary variable,
+         * - the right child child has not been eliminated (optimized)
          * - the ASGN node comes just after its right child node
          *   (TODO: could it be more general? => re-ordering ?)
          * - the left value is de-referenceable,
@@ -539,6 +540,7 @@ static void tmpalloc(Node p) {
          * (as the result of this child node)
          */
             if (optype(p->op)!=B        // no optimization on ASGNB (struct) nodes
+                && !right->x.optimized
                 && p==right->x.next
                 && is_temporary(right->x.result)
                 && is_dereferenceable(left->x.adrmode)
