@@ -696,7 +696,7 @@ static void emitdag0(Node p) {
     switch (p->op) {
         case BANDU:  binary("BANDU");  break;
         case BORU:   binary("BORU" );  break;
-        case BXORU:  binary("BXOR" );  break;
+        case BXORU:  binary("BXORU");  break;
         case ADDD:   binary("ADDD");   break;
         case ADDF:   binary("ADDF");   break;
         case ADDI:   binary("ADDI");   break;
