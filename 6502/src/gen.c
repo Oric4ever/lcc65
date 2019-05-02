@@ -29,7 +29,7 @@
  */
 
 
-char *version="/* 16-bit code V1.35 */\n";
+char *version="/* 16-bit code V1.36 */\n";
 #include "c.h"
 #include <string.h>
 #include <stdio.h>
@@ -719,8 +719,8 @@ static void emitdag0(Node p) {
         case MODU:   binary("MODU");   break;
         case RSHU:   binary("RSHU");   break;
         case RSHI:   binary("RSHI");   break;
-        case LSHI:   binary("LSHW");   break;
-        case LSHU:   binary("LSHW");   break;
+        case LSHI:   binary("LSHI");   break;
+        case LSHU:   binary("LSHU");   break;
         case INDIRC: unary("INDIRC");  break;
         case INDIRS: unary("INDIRS");  break;
         case INDIRI: unary("INDIRI");  break;
