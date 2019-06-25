@@ -19,7 +19,7 @@
  * the macros emitted by the backend. However, lcc's frontend was designed
  * for working straight forward with backends for RISC processors with
  * a load/store architecture and many registers so that operations only take
- * registers operand. The 6502 instead has a single register that can be used
+ * register operands. The 6502 instead has a single register that can be used
  * in operations whilst the second operand is in memory. So, I designed this
  * 6502 backend to use pseudo-registers in zero-page (this seems natural),
  * but also to propagate addressing-mode information in order to exploit
@@ -29,7 +29,7 @@
  */
 
 
-char *version="/* 16-bit code V1.36 */\n";
+char *version="/* 16-bit code V1.37 */\n";
 #include "c.h"
 #include <string.h>
 #include <stdio.h>
@@ -291,21 +291,26 @@ void defconst(int ty, Value v) {
     }
 }
 
+bool displayable(char c) { 
+    return c>=' ' && c!=127     // char is signed
+        && c!=':' && c!=';';    // beware of line-splits at : or ;
+}
+
 void defstring(int len, char *s) {
     if (graph_output) return;
     while (len > 0) {
-        if (s[0]==';' || s[0]<32 || s[0]==127) {
+        if (!displayable(s[0])) {
             print("\tDB($%x)\n",(unsigned char)*s++);
             len--;
-            while (len>0 && (s[0]==';' || s[0]<32 || s[0]==127)) {
+            while (len>0 && !displayable(s[0])) {
                 print("\tDB($%x)\n",(unsigned char)*s++);
                 len--;
             }
-            print("\n");
         } else {
+            int size=0;
             print("\tSTRING \"");
-            while (len>0 && s[0]!=';' && s[0]>=32 && s[0]!=127) {
-                len--;
+            while (len>0 && size<64 && displayable(s[0])) {
+                len--; size++;
                 if (s[0]=='"') print("\\\"");
                 else if (s[0]=='\\') print("\\\\");
                 else print("%c",s[0]);
