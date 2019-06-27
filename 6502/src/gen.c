@@ -292,7 +292,7 @@ void defconst(int ty, Value v) {
 }
 
 bool displayable(char c) { 
-    return c>=' ' && c!=127     // char is signed
+    return c>=' ' && c<127
         && c!=':' && c!=';';    // beware of line-splits at : or ;
 }
 
