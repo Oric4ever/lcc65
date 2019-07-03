@@ -29,7 +29,7 @@
  */
 
 
-char *version="/* 16-bit code V1.37 */\n";
+char *version="/* 16-bit code V1.38 */\n";
 #include "c.h"
 #include <string.h>
 #include <stdio.h>
@@ -291,33 +291,11 @@ void defconst(int ty, Value v) {
     }
 }
 
-bool displayable(char c) { 
-    return c>=' ' && c<127
-        && c!=':' && c!=';';    // beware of line-splits at : or ;
-}
-
 void defstring(int len, char *s) {
     if (graph_output) return;
     while (len > 0) {
-        if (!displayable(s[0])) {
-            print("\tDB($%x)\n",(unsigned char)*s++);
-            len--;
-            while (len>0 && !displayable(s[0])) {
-                print("\tDB($%x)\n",(unsigned char)*s++);
-                len--;
-            }
-        } else {
-            int size=0;
-            print("\tSTRING \"");
-            while (len>0 && size<64 && displayable(s[0])) {
-                len--; size++;
-                if (s[0]=='"') print("\\\"");
-                else if (s[0]=='\\') print("\\\\");
-                else print("%c",s[0]);
-                s++;
-            }
-            print("\"\n");
-        }
+        print("\tDB($%x)\n",(unsigned char)*s++);
+        len--;
     }
 }
 
